@@ -775,14 +775,20 @@
   - 新增/修改代码时，注释优先使用中文（在不影响可读性的前提下）。
   - 推送前必须确保仓库状态整洁，并完成必要提交。
 - 执行策略：
-  - 由于当前 git 根目录在上级工作区，推送时采用“`market-signal-system` 子目录独立导出后推送”方案，避免把无关目录一并上传。
+  - Git 仅使用当前项目目录 `/root/.openclaw/workspace/market-signal-system` 作为唯一仓库根目录。
+  - 不再使用上级 workspace 的 `subtree/split` 方案，不再引用上级仓库。
+  - 后续提交与推送统一在当前仓库执行，远程统一使用 `origin`。
 
 ## 本轮摘要（2026-03-16 GitHub 推送准备与执行）
 - 当前进展：
-  - 已按“子目录独立导出”方案执行：`git subtree split --prefix=market-signal-system -b mss-push-20260316`。
-  - 已绑定远程：`trading = https://github.com/xiaozhang66666666/trading.git`。
-  - 已执行推送命令：`git push https://github.com/xiaozhang66666666/trading.git mss-push-20260316:main`。
+  - 已确认当前目录是独立 Git 仓库，且 `origin` 已配置为目标远程仓库。
 - 阻塞：
   - 推送失败：`could not read Username for 'https://github.com'`（当前环境缺少 GitHub 凭据）。
 - 下一步：
-  1. 注入可写凭据（PAT 或 SSH 私钥）后重试：`git push trading mss-push-20260316:main`。
+  1. 注入可写凭据（PAT 或 SSH 私钥）后重试：`git push -u origin <当前分支>`。
+
+## 约束修正（2026-03-16）
+- 用户明确要求并已生效：
+  - 当前项目目录是唯一 Git 根与工作目录：`/root/.openclaw/workspace/market-signal-system`。
+  - 后续禁止使用上级 workspace 的 `subtree/split` 流程。
+  - 后续禁止引用上级仓库，提交/推送仅在本仓库内进行（`origin`）。

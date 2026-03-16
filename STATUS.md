@@ -792,3 +792,9 @@
   - 当前项目目录是唯一 Git 根与工作目录：`/root/.openclaw/workspace/market-signal-system`。
   - 后续禁止使用上级 workspace 的 `subtree/split` 流程。
   - 后续禁止引用上级仓库，提交/推送仅在本仓库内进行（`origin`）。
+
+## 约束公告（2026-03-16）
+- 从本时间点起执行：
+  - commit message 一律中文；
+  - 代码注释中文优先；
+  - 推送前仓库必须 clean。

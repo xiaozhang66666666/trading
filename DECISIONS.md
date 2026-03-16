@@ -1,5 +1,11 @@
 # DECISIONS
 
+## D-199 组合模拟恢复审计下沉到 summary
+- 日期：2026-03-16
+- 决策：`simulate-portfolio` 新增 `sim_portfolio_summary_*.json`，并输出 `snapshot_before/snapshot_after` 与 `skipped_duplicate_bars_run_delta(total/by_symbol)`。
+- 原因：此前组合模拟只有信号/资金/成交 CSV，缺少结构化恢复审计，重放同窗时难快速判断“本次是否发生重复 bar 跳过”。
+- 取舍：新增一个 JSON 工件会增加少量文件管理成本，但恢复行为可观测性显著提升，便于批处理巡检与回归测试。
+
 ## D-195 simulate 恢复采用“幂等跳过重复 bar”
 - 日期：2026-03-16
 - 决策：`PaperBroker` 增加 `last_processed_at`（按 symbol 记录最后处理时间），`simulate` 重跑同一时间窗口时自动跳过已处理 bar。

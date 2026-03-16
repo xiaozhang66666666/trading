@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -218,3 +219,48 @@ def test_simulate_portfolio_blocks_when_margin_or_reserve_exhausted(monkeypatch,
     signals = pd.read_csv(signal_file)
     blocked = signals[(signals["symbol"] == "ETH") & signals["reason"].str.contains("risk_margin_block", regex=False)]
     assert not blocked.empty
+
+
+def test_simulate_portfolio_summary_tracks_duplicate_replay_delta(monkeypatch, tmp_path):
+    dm = FakeDataManager({"QQQ": _build_frame([100, 101, 102, 103])})
+    broker = PaperBroker(
+        state_file="unit_portfolio_replay.json",
+        initial_cash=100000.0,
+        fee_rate=0.0,
+        slippage_bps=0.0,
+    )
+    broker.state_path = tmp_path / "unit_portfolio_replay.json"
+
+    monkeypatch.setattr(cli, "DataManager", lambda: dm)
+    monkeypatch.setattr(cli, "get_strategy", lambda *args, **kwargs: AlwaysLongStrategy())
+    monkeypatch.setattr(cli, "create_broker", lambda *args, **kwargs: broker)
+    monkeypatch.setattr(cli, "OUTPUT_DIR", tmp_path)
+
+    args = argparse.Namespace(
+        symbols="QQQ",
+        strategy="momentum",
+        params=None,
+        start="2024-01-01",
+        end="2024-01-04",
+        interval="1d",
+        state_file="unit_portfolio_replay.json",
+        allocation_per_signal=0.3,
+        max_symbol_allocation=0.5,
+        max_total_allocation=0.6,
+        initial_margin_rate=1.0,
+        cash_reserve_ratio=0.05,
+        max_portfolio_drawdown=None,
+        risk_cooldown_bars=0,
+        summary_file="unit_portfolio_replay_summary.json",
+    )
+
+    cli.cmd_simulate_portfolio(args)
+    first_summary = json.loads((tmp_path / "unit_portfolio_replay_summary.json").read_text(encoding="utf-8"))
+    assert int(first_summary["skipped_duplicate_bars_run_delta"]["total"]) == 0
+
+    cli.cmd_simulate_portfolio(args)
+    second_summary = json.loads((tmp_path / "unit_portfolio_replay_summary.json").read_text(encoding="utf-8"))
+    assert int(second_summary["skipped_duplicate_bars_run_delta"]["total"]) > 0
+    assert int(second_summary["snapshot_after"]["skipped_duplicate_bars_total"]) > int(
+        second_summary["snapshot_before"]["skipped_duplicate_bars_total"]
+    )

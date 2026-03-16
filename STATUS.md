@@ -1,5 +1,19 @@
 # STATUS
 
+## 本轮摘要（2026-03-16 组合模拟恢复审计）
+- 当前进展：
+  - `simulate-portfolio` 新增结构化摘要输出：`sim_portfolio_summary_<symbols>_<strategy>.json`（支持 `--summary-file` 覆盖）。
+  - 组合摘要新增恢复审计：`skipped_duplicate_bars_run_delta.total/by_symbol`，用于区分“历史累计跳过量”与“本次运行新增跳过量”。
+  - 组合摘要同时记录 `snapshot_before/snapshot_after`，便于核对重放幂等是否按预期触发。
+  - `run-config` 默认参数已接入 `simulate-portfolio.summary_file`，配置驱动链路可直接落地组合摘要。
+  - 新增回归：
+    - `test_simulate_portfolio_summary_tracks_duplicate_replay_delta`（同窗重放时增量跳过计数应上升）。
+    - `test_parse_config_task_simulate_portfolio_defaults` 补充 `summary_file` 默认值断言。
+- 下一步：
+  1. 为 `simulate-portfolio` 增加 `output_tag`，减少同策略多参数实验的工件覆盖风险。
+  2. 将组合摘要接入 `baseline-summary/report`，统一展示恢复幂等审计指标。
+- 阻塞：无。
+
 ## 本轮摘要（2026-03-16 模拟恢复幂等化）
 - 当前进展：
   - 新增 `scripts/compact_project_docs.py`：支持按“保留最近 N 个二级章节”压缩 `STATUS.md/DECISIONS.md`，并把原文档归档到 `docs/history/`。

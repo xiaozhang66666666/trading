@@ -352,6 +352,7 @@ def _config_defaults(command: str) -> dict[str, Any]:
             "cash_reserve_ratio": 0.05,
             "max_portfolio_drawdown": None,
             "risk_cooldown_bars": 20,
+            "summary_file": None,
             "params": None,
         }
     if command == "research":
@@ -826,6 +827,29 @@ def _collect_compare_symbol_champions(args: argparse.Namespace) -> list[dict[str
     return _extract_symbol_champions_from_leaderboard(path)
 
 
+def _compute_counter_delta(
+    initial: dict[str, Any],
+    final: dict[str, Any],
+) -> tuple[int, dict[str, int]]:
+    initial_total = int(initial.get("skipped_duplicate_bars_total", 0))
+    final_total = int(final.get("skipped_duplicate_bars_total", 0))
+    initial_by_symbol = {
+        str(symbol): int(value)
+        for symbol, value in dict(initial.get("skipped_duplicate_bars_by_symbol", {})).items()
+    }
+    final_by_symbol = {
+        str(symbol): int(value)
+        for symbol, value in dict(final.get("skipped_duplicate_bars_by_symbol", {})).items()
+    }
+
+    delta_by_symbol: dict[str, int] = {}
+    for symbol in sorted(set(initial_by_symbol.keys()) | set(final_by_symbol.keys())):
+        delta = int(final_by_symbol.get(symbol, 0)) - int(initial_by_symbol.get(symbol, 0))
+        if delta != 0:
+            delta_by_symbol[symbol] = delta
+    return final_total - initial_total, delta_by_symbol
+
+
 def cmd_fetch(args: argparse.Namespace) -> None:
     dm = DataManager()
     df = dm.get_history(
@@ -1096,6 +1120,8 @@ def cmd_simulate(args: argparse.Namespace) -> None:
     account_id = normalize_account_id(getattr(args, "account_id", DEFAULT_ACCOUNT_ID))
     resolved_state_file = _resolve_account_state_file(account_id, args.state_file)
     broker = create_broker(state_file=resolved_state_file)
+    initial_snapshot = broker.snapshot()
+    initial_snapshot = broker.snapshot()
     allocation_per_signal = getattr(args, "allocation_per_signal", None)
     min_quantity = float(getattr(args, "min_quantity", 0.0))
     if allocation_per_signal is not None and not 0 < float(allocation_per_signal) <= 1:
@@ -1251,6 +1277,7 @@ def cmd_simulate_portfolio(args: argparse.Namespace) -> None:
     account_id = normalize_account_id(getattr(args, "account_id", DEFAULT_ACCOUNT_ID))
     resolved_state_file = _resolve_account_state_file(account_id, args.state_file)
     broker = create_broker(state_file=resolved_state_file)
+    initial_snapshot = broker.snapshot()
 
     if hasattr(dm, "get_aligned_history"):
         bars = dm.get_aligned_history(
@@ -1417,16 +1444,41 @@ def cmd_simulate_portfolio(args: argparse.Namespace) -> None:
     broker.save_state()
 
     trades_df = pd.DataFrame([t.__dict__ for t in broker.trades])
+    trades_path = OUTPUT_DIR / f"sim_portfolio_trades_{'_'.join(symbols)}_{args.strategy}.csv"
     if not trades_df.empty:
-        path = OUTPUT_DIR / f"sim_portfolio_trades_{'_'.join(symbols)}_{args.strategy}.csv"
-        trades_df.to_csv(path, index=False)
-        print(f"Saved trade log: {path}")
+        trades_df.to_csv(trades_path, index=False)
+        print(f"Saved trade log: {trades_path}")
     signal_path = OUTPUT_DIR / f"sim_portfolio_signals_{'_'.join(symbols)}_{args.strategy}.csv"
     pd.DataFrame(signal_rows).to_csv(signal_path, index=False)
     capital_path = OUTPUT_DIR / f"sim_portfolio_capital_{'_'.join(symbols)}_{args.strategy}.csv"
     pd.DataFrame(capital_rows).to_csv(capital_path, index=False)
+    summary_path = OUTPUT_DIR / (
+        getattr(args, "summary_file", None) or f"sim_portfolio_summary_{'_'.join(symbols)}_{args.strategy}.json"
+    )
+    final_snapshot = broker.snapshot()
+    skipped_delta_total, skipped_delta_by_symbol = _compute_counter_delta(initial_snapshot, final_snapshot)
+    summary_payload = {
+        "account_id": account_id,
+        "symbols": symbols,
+        "strategy": args.strategy,
+        "start": args.start,
+        "end": args.end,
+        "interval": args.interval,
+        "state_file": resolved_state_file,
+        "signal_file": signal_path.name,
+        "capital_file": capital_path.name,
+        "trades_file": trades_path.name if trades_path.exists() else None,
+        "skipped_duplicate_bars_run_delta": {
+            "total": int(skipped_delta_total),
+            "by_symbol": skipped_delta_by_symbol,
+        },
+        "snapshot_before": initial_snapshot,
+        "snapshot_after": final_snapshot,
+    }
+    summary_path.write_text(json.dumps(summary_payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Saved signal log: {signal_path}")
     print(f"Saved capital log: {capital_path}")
+    print(f"Saved simulate-portfolio summary: {summary_path}")
     SQLiteStore(getattr(args, "db_file", None)).upsert_sim_state_meta(
         account_id=account_id,
         state_key=f"simulate_portfolio:{'_'.join(symbols)}:{args.strategy}",
@@ -1439,7 +1491,7 @@ def cmd_simulate_portfolio(args: argparse.Namespace) -> None:
         },
     )
 
-    print(json.dumps(broker.snapshot(), ensure_ascii=False, indent=2))
+    print(json.dumps(final_snapshot, ensure_ascii=False, indent=2))
     print(f"State persisted: data/state/{resolved_state_file}")
 
 
@@ -2154,6 +2206,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     simulate_portfolio.add_argument("--max-portfolio-drawdown", type=float, help="组合最大回撤阈值（0~1）")
     simulate_portfolio.add_argument("--risk-cooldown-bars", type=int, default=20, help="回撤触发后禁止新开仓 bar 数")
+    simulate_portfolio.add_argument(
+        "--summary-file",
+        help="组合模拟结果摘要输出文件名（默认 sim_portfolio_summary_<symbols>_<strategy>.json）",
+    )
     simulate_portfolio.set_defaults(func=cmd_simulate_portfolio)
 
     research = sub.add_parser("research", help="参数搜索 + Walk-Forward 稳健性评估")

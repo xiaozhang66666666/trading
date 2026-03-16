@@ -416,6 +416,7 @@ def test_parse_config_task_simulate_portfolio_defaults(tmp_path):
     assert args.cash_reserve_ratio == 0.05
     assert args.max_portfolio_drawdown is None
     assert args.risk_cooldown_bars == 20
+    assert args.summary_file is None
 
 
 def test_parse_config_task_simulate_defaults(tmp_path):

@@ -322,6 +322,13 @@ python3 scripts/smoke_simulate_resume.py
 
 `simulate` 对同一 `state-file + symbol` 新增幂等恢复保护：若重跑覆盖已处理时间区间，会自动跳过重复 bar，避免重复开平仓与重复记账。
 
+`simulate-portfolio` 同样支持幂等恢复：重跑同一 `state-file + symbols` 时间窗口时会跳过重复 bar，并在 `sim_portfolio_summary` 中输出本次增量审计字段。
+
+恢复执行最佳实践：
+- 同一策略连续运行时复用同一个 `state-file`，通过分段 `start/end` 续跑。
+- 对并行实验使用不同 `state-file`（或不同 `account-id`）隔离状态。
+- 回放验证优先查看 `sim_summary` / `sim_portfolio_summary` 中的 `skipped_duplicate_bars_*` 字段。
+
 `simulate` 输出文件：
 - `outputs/sim_signals_<symbol>_<strategy>.csv`
 - `outputs/sim_trades_<symbol>_<strategy>.csv`（若有成交）
@@ -895,6 +902,8 @@ PYTHONPATH=src python3 -m market_signal_system stability \
 - 组合信号日志：`outputs/sim_portfolio_signals_<symbols>_<strategy>.csv`
 - 组合交易日志：`outputs/sim_portfolio_trades_<symbols>_<strategy>.csv`
 - 组合资金快照：`outputs/sim_portfolio_capital_<symbols>_<strategy>.csv`
+- 组合模拟摘要：`outputs/sim_portfolio_summary_<symbols>_<strategy>.json`
+  - 含恢复幂等增量审计：`skipped_duplicate_bars_run_delta.total`、`skipped_duplicate_bars_run_delta.by_symbol`
 - 状态文件：`data/state/<state-file>`（支持重启恢复）
 - 参数网格报告：`outputs/grid_<symbol>_<strategy>.csv`
 - Walk-Forward 明细：`outputs/walk_forward_<symbol>_<strategy>.csv`

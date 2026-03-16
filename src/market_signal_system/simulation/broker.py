@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 
 from market_signal_system.utils.paths import STATE_DIR, ensure_runtime_dirs
@@ -56,6 +57,7 @@ class PaperBroker:
         self.positions: dict[str, Position] = {}
         self.trades: list[Trade] = []
         self._entry_times: dict[str, str] = {}
+        self._last_processed_at: dict[str, str] = {}
 
         if self.state_path.exists():
             self.load_state()
@@ -68,6 +70,10 @@ class PaperBroker:
         timestamp: str,
         quantity: float = 1.0,
     ) -> None:
+        normalized_ts = self._normalize_timestamp(timestamp)
+        if self._is_duplicate_bar(symbol=symbol, timestamp=normalized_ts):
+            return
+
         target_side = int(max(-1, min(1, signal)))
         current = self.positions.get(symbol)
         current_side = current.side if current else 0
@@ -76,10 +82,11 @@ class PaperBroker:
             current.mark_price = price
 
         if target_side == current_side:
+            self._last_processed_at[symbol] = normalized_ts
             return
 
         if current is not None:
-            self._close_position(symbol=symbol, exit_price=price, exit_time=timestamp)
+            self._close_position(symbol=symbol, exit_price=price, exit_time=normalized_ts)
 
         if target_side != 0:
             self._open_position(
@@ -87,8 +94,9 @@ class PaperBroker:
                 side=target_side,
                 quantity=quantity,
                 entry_price=price,
-                entry_time=timestamp,
+                entry_time=normalized_ts,
             )
+        self._last_processed_at[symbol] = normalized_ts
 
     def mark_to_market(self, symbol: str, price: float) -> None:
         pos = self.positions.get(symbol)
@@ -129,6 +137,7 @@ class PaperBroker:
             "positions": {k: asdict(v) for k, v in self.positions.items()},
             "trades": [asdict(t) for t in self.trades],
             "entry_times": self._entry_times,
+            "last_processed_at": self._last_processed_at,
         }
         self.state_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -146,6 +155,26 @@ class PaperBroker:
 
         self.trades = [Trade(**row) for row in payload.get("trades", [])]
         self._entry_times = dict(payload.get("entry_times", {}))
+        self._last_processed_at = {
+            str(symbol): self._normalize_timestamp(str(ts))
+            for symbol, ts in payload.get("last_processed_at", {}).items()
+        }
+
+    def _is_duplicate_bar(self, symbol: str, timestamp: str) -> bool:
+        last_ts = self._last_processed_at.get(symbol)
+        return bool(last_ts and timestamp <= last_ts)
+
+    @staticmethod
+    def _normalize_timestamp(timestamp: str) -> str:
+        raw = timestamp.strip()
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.isoformat()
 
     def _open_position(
         self,

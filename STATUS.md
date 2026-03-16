@@ -1,5 +1,16 @@
 # STATUS
 
+## 本轮摘要（2026-03-16 模拟恢复幂等化）
+- 当前进展：
+  - `PaperBroker` 新增“按标的记录最后处理时间”的状态字段 `last_processed_at`，并持久化到 `data/state/*.json`。
+  - `simulate` 在加载历史状态后，若重跑同一时间窗口会自动跳过已处理 bar，避免重复开平仓、重复手续费与重复交易日志。
+  - 新增回归 `test_cmd_simulate_replay_same_window_is_idempotent`，锁定“同窗口重放不重复记账”。
+  - 保留原有恢复语义：分段续跑（例如先到 `T1`，再到 `T2`）仍可继续产生新增交易，相关离线冒烟保持通过。
+- 下一步：
+  1. 将相同幂等语义扩展到 `simulate-portfolio` 的输出摘要层（增加“跳过计数”统计，便于审计）。
+  2. 增补 README 的“恢复执行最佳实践”小节（推荐切片执行与状态文件命名规范）。
+- 阻塞：无。
+
 ## 本轮摘要（2026-03-16 Web 登录 MVP）
 - 当前进展：
   - `appdb` 已补 PostgreSQL 占位层：`PostgresConnectionFactory/PostgresSchemaManager/PostgresAuthRepository/PostgresSignalPilotRepository`（当前明确抛 `NotImplementedError`，用于迁移落点与接口约束）。

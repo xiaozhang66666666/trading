@@ -229,3 +229,70 @@ def test_cmd_simulate_supports_allocation_per_signal_dynamic_quantity(tmp_path, 
     trade = resumed.trades[0]
     # 10% of 100000 at entry price 100 => quantity ~= 100
     assert trade.quantity == 100.0
+
+
+def test_cmd_simulate_replay_same_window_is_idempotent(tmp_path, monkeypatch):
+    idx = pd.date_range("2026-03-01", periods=3, freq="D", tz="UTC")
+    df = pd.DataFrame(
+        {
+            "open": [100.0, 101.0, 99.0],
+            "high": [101.0, 102.0, 100.0],
+            "low": [99.0, 100.0, 98.0],
+            "close": [100.0, 101.0, 99.0],
+            "volume": [1000.0, 1000.0, 1000.0],
+            "signal": [1, 1, 0],
+        },
+        index=idx,
+    )
+
+    class FakeDataManager:
+        def get_history(self, symbol: str, start: str, end: str, interval: str = "1d"):  # noqa: ARG002
+            return df
+
+    class FakeStrategy:
+        def generate_signals(self, data: pd.DataFrame) -> pd.Series:
+            return data["signal"].astype(int)
+
+        def explain(self, data: pd.DataFrame) -> pd.DataFrame:
+            return pd.DataFrame(
+                {
+                    "signal": data["signal"].astype(int),
+                    "reason": ["idempotent_test"] * len(data),
+                },
+                index=data.index,
+            )
+
+    monkeypatch.setattr(cli, "DataManager", FakeDataManager)
+    monkeypatch.setattr(cli, "get_strategy", lambda *_args, **_kwargs: FakeStrategy())
+    monkeypatch.setattr(cli, "OUTPUT_DIR", tmp_path / "outputs")
+    monkeypatch.setattr("market_signal_system.simulation.broker.STATE_DIR", tmp_path / "state")
+    cli.ensure_runtime_dirs()
+    (tmp_path / "outputs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "state").mkdir(parents=True, exist_ok=True)
+
+    args = argparse.Namespace(
+        symbol="QQQ",
+        strategy="momentum",
+        params=None,
+        start="2026-03-01",
+        end="2026-03-03",
+        interval="1d",
+        state_file="idempotent_state.json",
+        quantity=1.0,
+        allocation_per_signal=None,
+        min_quantity=0.0,
+        summary_file=None,
+    )
+    cli.cmd_simulate(args)
+    first = PaperBroker(state_file="idempotent_state.json", initial_cash=100000.0)
+    first.state_path = tmp_path / "state" / "idempotent_state.json"
+    first.load_state()
+    first_trade_count = len(first.trades)
+    assert first_trade_count == 1
+
+    # 重跑完全相同时间窗口，不应重复开平仓。
+    cli.cmd_simulate(args)
+    second = PaperBroker(state_file="idempotent_state.json", initial_cash=100000.0)
+    second.state_path = tmp_path / "state" / "idempotent_state.json"
+    second.load_state()
+    assert len(second.trades) == first_trade_count

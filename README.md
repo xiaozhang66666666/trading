@@ -307,6 +307,8 @@ PYTHONPATH=src python3 -m market_signal_system simulate-portfolio \
 python3 scripts/smoke_simulate_resume.py
 ```
 
+`simulate` 对同一 `state-file + symbol` 新增幂等恢复保护：若重跑覆盖已处理时间区间，会自动跳过重复 bar，避免重复开平仓与重复记账。
+
 `simulate` 输出文件：
 - `outputs/sim_signals_<symbol>_<strategy>.csv`
 - `outputs/sim_trades_<symbol>_<strategy>.csv`（若有成交）

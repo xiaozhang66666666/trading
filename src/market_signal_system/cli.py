@@ -352,6 +352,7 @@ def _config_defaults(command: str) -> dict[str, Any]:
             "cash_reserve_ratio": 0.05,
             "max_portfolio_drawdown": None,
             "risk_cooldown_bars": 20,
+            "output_tag": None,
             "summary_file": None,
             "params": None,
         }
@@ -1443,17 +1444,18 @@ def cmd_simulate_portfolio(args: argparse.Namespace) -> None:
 
     broker.save_state()
 
+    tag = f"_{args.output_tag}" if getattr(args, "output_tag", None) else ""
     trades_df = pd.DataFrame([t.__dict__ for t in broker.trades])
-    trades_path = OUTPUT_DIR / f"sim_portfolio_trades_{'_'.join(symbols)}_{args.strategy}.csv"
+    trades_path = OUTPUT_DIR / f"sim_portfolio_trades_{'_'.join(symbols)}_{args.strategy}{tag}.csv"
     if not trades_df.empty:
         trades_df.to_csv(trades_path, index=False)
         print(f"Saved trade log: {trades_path}")
-    signal_path = OUTPUT_DIR / f"sim_portfolio_signals_{'_'.join(symbols)}_{args.strategy}.csv"
+    signal_path = OUTPUT_DIR / f"sim_portfolio_signals_{'_'.join(symbols)}_{args.strategy}{tag}.csv"
     pd.DataFrame(signal_rows).to_csv(signal_path, index=False)
-    capital_path = OUTPUT_DIR / f"sim_portfolio_capital_{'_'.join(symbols)}_{args.strategy}.csv"
+    capital_path = OUTPUT_DIR / f"sim_portfolio_capital_{'_'.join(symbols)}_{args.strategy}{tag}.csv"
     pd.DataFrame(capital_rows).to_csv(capital_path, index=False)
     summary_path = OUTPUT_DIR / (
-        getattr(args, "summary_file", None) or f"sim_portfolio_summary_{'_'.join(symbols)}_{args.strategy}.json"
+        getattr(args, "summary_file", None) or f"sim_portfolio_summary_{'_'.join(symbols)}_{args.strategy}{tag}.json"
     )
     final_snapshot = broker.snapshot()
     skipped_delta_total, skipped_delta_by_symbol = _compute_counter_delta(initial_snapshot, final_snapshot)
@@ -1464,6 +1466,7 @@ def cmd_simulate_portfolio(args: argparse.Namespace) -> None:
         "start": args.start,
         "end": args.end,
         "interval": args.interval,
+        "output_tag": getattr(args, "output_tag", None),
         "state_file": resolved_state_file,
         "signal_file": signal_path.name,
         "capital_file": capital_path.name,
@@ -2206,6 +2209,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     simulate_portfolio.add_argument("--max-portfolio-drawdown", type=float, help="组合最大回撤阈值（0~1）")
     simulate_portfolio.add_argument("--risk-cooldown-bars", type=int, default=20, help="回撤触发后禁止新开仓 bar 数")
+    simulate_portfolio.add_argument("--output-tag", help="组合模拟输出文件标签（用于区分同策略多参数批量运行）")
     simulate_portfolio.add_argument(
         "--summary-file",
         help="组合模拟结果摘要输出文件名（默认 sim_portfolio_summary_<symbols>_<strategy>.json）",

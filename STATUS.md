@@ -798,3 +798,12 @@
   - commit message 一律中文；
   - 代码注释中文优先；
   - 推送前仓库必须 clean。
+
+## 本轮摘要（2026-03-16 推送自动化补齐）
+- 当前进展：
+  - 新增 `scripts/push_github.sh`，内置 clean 检查 + 远程绑定 + PAT 环境变量推送逻辑。
+  - README 已新增推送使用说明。
+  - 已验证脚本执行路径；当前失败点仍为凭据缺失。
+- 下一步：
+  1. 在环境中提供 `GITHUB_TOKEN` 后执行：`GITHUB_TOKEN=*** ./scripts/push_github.sh`。
+- 阻塞：`fatal: could not read Username for 'https://github.com'`。

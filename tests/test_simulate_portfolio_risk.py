@@ -264,3 +264,43 @@ def test_simulate_portfolio_summary_tracks_duplicate_replay_delta(monkeypatch, t
     assert int(second_summary["snapshot_after"]["skipped_duplicate_bars_total"]) > int(
         second_summary["snapshot_before"]["skipped_duplicate_bars_total"]
     )
+
+
+def test_simulate_portfolio_output_tag_writes_tagged_files(monkeypatch, tmp_path):
+    dm = FakeDataManager({"QQQ": _build_frame([100, 101, 102])})
+    broker = PaperBroker(
+        state_file="unit_portfolio_tagged.json",
+        initial_cash=100000.0,
+        fee_rate=0.0,
+        slippage_bps=0.0,
+    )
+    broker.state_path = tmp_path / "unit_portfolio_tagged.json"
+
+    monkeypatch.setattr(cli, "DataManager", lambda: dm)
+    monkeypatch.setattr(cli, "get_strategy", lambda *args, **kwargs: AlwaysLongStrategy())
+    monkeypatch.setattr(cli, "create_broker", lambda *args, **kwargs: broker)
+    monkeypatch.setattr(cli, "OUTPUT_DIR", tmp_path)
+
+    args = argparse.Namespace(
+        symbols="QQQ",
+        strategy="momentum",
+        params=None,
+        start="2024-01-01",
+        end="2024-01-03",
+        interval="1d",
+        state_file="unit_portfolio_tagged.json",
+        allocation_per_signal=0.3,
+        max_symbol_allocation=0.5,
+        max_total_allocation=0.6,
+        initial_margin_rate=1.0,
+        cash_reserve_ratio=0.05,
+        max_portfolio_drawdown=None,
+        risk_cooldown_bars=0,
+        output_tag="case_a",
+        summary_file=None,
+    )
+    cli.cmd_simulate_portfolio(args)
+
+    assert (tmp_path / "sim_portfolio_signals_QQQ_momentum_case_a.csv").exists()
+    assert (tmp_path / "sim_portfolio_capital_QQQ_momentum_case_a.csv").exists()
+    assert (tmp_path / "sim_portfolio_summary_QQQ_momentum_case_a.json").exists()

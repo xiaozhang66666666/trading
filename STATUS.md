@@ -5,13 +5,15 @@
   - `simulate-portfolio` 新增结构化摘要输出：`sim_portfolio_summary_<symbols>_<strategy>.json`（支持 `--summary-file` 覆盖）。
   - 组合摘要新增恢复审计：`skipped_duplicate_bars_run_delta.total/by_symbol`，用于区分“历史累计跳过量”与“本次运行新增跳过量”。
   - 组合摘要同时记录 `snapshot_before/snapshot_after`，便于核对重放幂等是否按预期触发。
+  - `simulate-portfolio` 新增 `--output-tag`，组合信号/交易/资金/摘要工件支持带标签并存，降低多参数实验覆盖风险。
   - `run-config` 默认参数已接入 `simulate-portfolio.summary_file`，配置驱动链路可直接落地组合摘要。
   - 新增回归：
     - `test_simulate_portfolio_summary_tracks_duplicate_replay_delta`（同窗重放时增量跳过计数应上升）。
+    - `test_simulate_portfolio_output_tag_writes_tagged_files`（验证 `--output-tag` 命名生效）。
     - `test_parse_config_task_simulate_portfolio_defaults` 补充 `summary_file` 默认值断言。
 - 下一步：
-  1. 为 `simulate-portfolio` 增加 `output_tag`，减少同策略多参数实验的工件覆盖风险。
-  2. 将组合摘要接入 `baseline-summary/report`，统一展示恢复幂等审计指标。
+  1. 将组合摘要接入 `baseline-summary/report`，统一展示恢复幂等审计指标。
+  2. 评估组合模拟摘要的跨 run 聚合（最近 N 次重放跳过率）。
 - 阻塞：无。
 
 ## 本轮摘要（2026-03-16 模拟恢复幂等化）

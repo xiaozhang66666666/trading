@@ -302,6 +302,7 @@ PYTHONPATH=src python3 -m market_signal_system simulate \
 PYTHONPATH=src python3 -m market_signal_system simulate-portfolio \
   --symbols QQQ,ETH \
   --strategy momentum \
+  --output-tag base_case \
   --allocation-per-signal 0.3 \
   --max-symbol-allocation 0.4 \
   --max-total-allocation 1.0 \
@@ -903,6 +904,7 @@ PYTHONPATH=src python3 -m market_signal_system stability \
 - 组合交易日志：`outputs/sim_portfolio_trades_<symbols>_<strategy>.csv`
 - 组合资金快照：`outputs/sim_portfolio_capital_<symbols>_<strategy>.csv`
 - 组合模拟摘要：`outputs/sim_portfolio_summary_<symbols>_<strategy>.json`
+  - 若设置 `--output-tag`，文件名会追加 `_<tag>` 后缀，便于同策略多参数并存。
   - 含恢复幂等增量审计：`skipped_duplicate_bars_run_delta.total`、`skipped_duplicate_bars_run_delta.by_symbol`
 - 状态文件：`data/state/<state-file>`（支持重启恢复）
 - 参数网格报告：`outputs/grid_<symbol>_<strategy>.csv`

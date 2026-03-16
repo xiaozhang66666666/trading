@@ -1,5 +1,11 @@
 # DECISIONS
 
+## D-200 组合模拟工件命名增加 output_tag
+- 日期：2026-03-16
+- 决策：`simulate-portfolio` 增加 `--output-tag`，并让 `signals/trades/capital/summary` 工件统一追加标签后缀。
+- 原因：同策略多参数实验频繁覆盖同名文件，导致结果追溯困难；单标的 `simulate` 已有同类能力，组合侧需要对齐。
+- 取舍：默认文件名保持不变以兼容历史脚本；启用标签时文件数量会增加，但可复现实验管理显著改善。
+
 ## D-199 组合模拟恢复审计下沉到 summary
 - 日期：2026-03-16
 - 决策：`simulate-portfolio` 新增 `sim_portfolio_summary_*.json`，并输出 `snapshot_before/snapshot_after` 与 `skipped_duplicate_bars_run_delta(total/by_symbol)`。

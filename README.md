@@ -64,6 +64,20 @@ source .venv/bin/activate
 python3 scripts/bootstrap_project.py --dev --mode pyproject
 ```
 
+## 推送到 GitHub（当前仓库）
+
+已内置推送脚本（推送前会检查仓库是否 clean）：
+
+```bash
+./scripts/push_github.sh
+```
+
+若使用 PAT，可直接：
+
+```bash
+GITHUB_TOKEN=你的令牌 ./scripts/push_github.sh
+```
+
 ## Web 登录 MVP（预置账号）
 
 1) 预置账号（后台脚本）：

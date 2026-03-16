@@ -46,6 +46,11 @@ Web 登录设计文档：[`docs/WEB_LOGIN_MVP_DESIGN.md`](docs/WEB_LOGIN_MVP_DES
 
 - Python 3.10+
 
+可选数据源稳定性环境变量（默认值在括号内）：
+- `MSS_DATA_HTTP_TIMEOUT`（`10.0`）
+- `MSS_DATA_HTTP_RETRIES`（`2`）
+- `MSS_DATA_HTTP_BACKOFF_SECONDS`（`0.4`）
+
 ## 安装
 
 ```bash

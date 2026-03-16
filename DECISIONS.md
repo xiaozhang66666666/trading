@@ -1,5 +1,11 @@
 # DECISIONS
 
+## D-202 数据源重试参数入口放在 DataManager（环境变量）
+- 日期：2026-03-16
+- 决策：`DataManager` 通过 `MSS_DATA_HTTP_TIMEOUT/MSS_DATA_HTTP_RETRIES/MSS_DATA_HTTP_BACKOFF_SECONDS` 统一向 Stooq/Binance/CoinGecko 注入请求参数。
+- 原因：不同机器/网络环境下免费源稳定性差异大，需要“无需改代码即可调参”的运维入口。
+- 取舍：先采用环境变量保证最小改动与高兼容；暂未扩展到每个命令独立参数，后续可按批处理需求补充。
+
 ## D-201 免费数据源请求策略采用“轻量重试 + 指数退避”
 - 日期：2026-03-16
 - 决策：在 `Stooq/Binance/CoinGecko` provider 内统一使用 `_get_with_retry`，默认 `retries=2`、`backoff_seconds=0.4`，针对 `429/5xx` 与网络异常自动重试。

@@ -306,3 +306,23 @@ def test_update_cache_returns_summary_and_grows_cache(tmp_path: Path, monkeypatc
     assert summary["cache_changed"] is True
     assert summary["window_rows"] >= 20
     assert provider.calls, "expected provider fetch when end is newer than cache"
+
+
+def test_data_manager_supports_env_override_for_http_retry(monkeypatch):
+    monkeypatch.setenv("MSS_DATA_HTTP_TIMEOUT", "12.5")
+    monkeypatch.setenv("MSS_DATA_HTTP_RETRIES", "5")
+    monkeypatch.setenv("MSS_DATA_HTTP_BACKOFF_SECONDS", "0.8")
+
+    manager = DataManager()
+    qqq_provider = manager.symbol_map["QQQ"].providers[1][0]
+    eth_provider = manager.symbol_map["ETH"].providers[0][0]
+
+    assert isinstance(qqq_provider, StooqDailyProvider)
+    assert qqq_provider.timeout == 12.5
+    assert qqq_provider.retries == 5
+    assert qqq_provider.backoff_seconds == 0.8
+
+    assert isinstance(eth_provider, BinanceSpotProvider)
+    assert eth_provider.timeout == 12.5
+    assert eth_provider.retries == 5
+    assert eth_provider.backoff_seconds == 0.8

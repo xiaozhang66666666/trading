@@ -1,5 +1,16 @@
 # STATUS
 
+## 本轮摘要（2026-03-16 数据层重试参数配置化）
+- 当前进展：
+  - `DataManager` 支持通过环境变量统一配置免费源请求参数：`MSS_DATA_HTTP_TIMEOUT`、`MSS_DATA_HTTP_RETRIES`、`MSS_DATA_HTTP_BACKOFF_SECONDS`。
+  - QQQ/ETH 的 `Stooq/Binance/CoinGecko` provider 初始化已接入上述参数，默认值与现有行为兼容。
+  - 新增回归 `test_data_manager_supports_env_override_for_http_retry`，覆盖环境变量覆写生效。
+  - README 已补“可选数据源稳定性环境变量”说明，便于本地/服务器按网络质量调优。
+- 下一步：
+  1. 评估是否为 `fetch/update-cache/mvp` 增加命令行级参数覆盖（高优先用于批处理任务）。
+  2. 给异常日志增加“最终使用的数据源”字段，提升排障可读性。
+- 阻塞：无。
+
 ## 本轮摘要（2026-03-16 免费数据源重试增强）
 - 当前进展：
   - 数据接入层新增轻量 HTTP 重试与指数退避：`StooqDailyProvider`、`BinanceSpotProvider`、`CoinGeckoProvider` 在 `429/5xx` 与网络抖动场景下自动重试。

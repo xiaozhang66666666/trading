@@ -24,30 +24,58 @@ class DataManager:
 
     def __init__(self) -> None:
         ensure_runtime_dirs()
+        timeout = self._env_float("MSS_DATA_HTTP_TIMEOUT", 10.0)
+        retries = self._env_int("MSS_DATA_HTTP_RETRIES", 2)
+        backoff = self._env_float("MSS_DATA_HTTP_BACKOFF_SECONDS", 0.4)
         self.symbol_map: dict[str, SymbolConfig] = {
-            "QQQ": SymbolConfig(providers=[(YahooFinanceProvider(), "QQQ"), (StooqDailyProvider(), "QQQ")]),
+            "QQQ": SymbolConfig(
+                providers=[
+                    (YahooFinanceProvider(), "QQQ"),
+                    (StooqDailyProvider(timeout=timeout, retries=retries, backoff_seconds=backoff), "QQQ"),
+                ]
+            ),
             "ETH": SymbolConfig(
                 providers=[
-                    (BinanceSpotProvider(), "ETHUSDT"),
+                    (BinanceSpotProvider(timeout=timeout, retries=retries, backoff_seconds=backoff), "ETHUSDT"),
                     (YahooFinanceProvider(), "ETH-USD"),
-                    (CoinGeckoProvider(), "ETH"),
+                    (CoinGeckoProvider(timeout=timeout, retries=retries, backoff_seconds=backoff), "ETH"),
                 ]
             ),
             "ETHUSD": SymbolConfig(
                 providers=[
-                    (BinanceSpotProvider(), "ETHUSDT"),
+                    (BinanceSpotProvider(timeout=timeout, retries=retries, backoff_seconds=backoff), "ETHUSDT"),
                     (YahooFinanceProvider(), "ETH-USD"),
-                    (CoinGeckoProvider(), "ETH"),
+                    (CoinGeckoProvider(timeout=timeout, retries=retries, backoff_seconds=backoff), "ETH"),
                 ]
             ),
             "ETHUSDT": SymbolConfig(
                 providers=[
-                    (BinanceSpotProvider(), "ETHUSDT"),
+                    (BinanceSpotProvider(timeout=timeout, retries=retries, backoff_seconds=backoff), "ETHUSDT"),
                     (YahooFinanceProvider(), "ETH-USD"),
-                    (CoinGeckoProvider(), "ETH"),
+                    (CoinGeckoProvider(timeout=timeout, retries=retries, backoff_seconds=backoff), "ETH"),
                 ]
             ),
         }
+
+    @staticmethod
+    def _env_float(key: str, default: float) -> float:
+        raw = os.getenv(key)
+        if raw is None:
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            return default
+
+    @staticmethod
+    def _env_int(key: str, default: int) -> int:
+        raw = os.getenv(key)
+        if raw is None:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            return default
 
     def get_history(
         self,

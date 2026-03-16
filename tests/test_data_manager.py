@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
+import requests
 
 from market_signal_system.data.base import DataProvider
 from market_signal_system.data.manager import DataManager, SymbolConfig
@@ -180,6 +181,74 @@ def test_stooq_provider_parses_daily_csv(monkeypatch):
     assert list(frame.columns) == ["open", "high", "low", "close", "volume"]
     assert len(frame) == 2
     assert frame.index.tz is not None
+
+
+def test_stooq_provider_retries_on_503(monkeypatch):
+    provider = StooqDailyProvider(retries=2, backoff_seconds=0.0)
+    start = pd.Timestamp("2024-01-01", tz="UTC")
+    end = pd.Timestamp("2024-01-03", tz="UTC")
+    calls = {"count": 0}
+
+    class _Resp503:
+        status_code = 503
+        text = "service unavailable"
+
+        @staticmethod
+        def json():
+            return {}
+
+    class _Resp200:
+        status_code = 200
+        text = (
+            "Date,Open,High,Low,Close,Volume\n"
+            "2024-01-01,400.0,405.0,398.0,404.0,1000000\n"
+            "2024-01-02,404.0,407.0,401.0,406.0,1200000\n"
+        )
+
+        @staticmethod
+        def json():
+            return {}
+
+    def _mock_get(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return _Resp503()
+        return _Resp200()
+
+    monkeypatch.setattr("market_signal_system.data.providers.time.sleep", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("market_signal_system.data.providers.requests.get", _mock_get)
+    frame = provider.fetch_history("QQQ", start=start, end=end, interval="1d")
+    assert len(frame) == 2
+    assert calls["count"] == 2
+
+
+def test_binance_provider_retries_on_request_exception(monkeypatch):
+    provider = BinanceSpotProvider(retries=2, backoff_seconds=0.0)
+    start = pd.Timestamp("2022-01-01", tz="UTC")
+    end = pd.Timestamp("2022-01-03", tz="UTC")
+    calls = {"count": 0}
+
+    class _Resp:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return [
+                [1640995200000, "3700", "3800", "3600", "3750", "100", 1641081599999, "0", 0, "0", "0", "0"],
+                [1641081600000, "3750", "3850", "3650", "3800", "110", 1641167999999, "0", 0, "0", "0", "0"],
+            ]
+
+    def _mock_get(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise requests.ConnectionError("temporary network error")
+        return _Resp()
+
+    monkeypatch.setattr("market_signal_system.data.providers.time.sleep", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("market_signal_system.data.providers.requests.get", _mock_get)
+    frame = provider.fetch_history("ETHUSDT", start=start, end=end, interval="1d")
+    assert len(frame) == 2
+    assert calls["count"] == 2
 
 
 def test_get_history_supports_weekly_interval_resample():

@@ -1,5 +1,11 @@
 # DECISIONS
 
+## D-201 免费数据源请求策略采用“轻量重试 + 指数退避”
+- 日期：2026-03-16
+- 决策：在 `Stooq/Binance/CoinGecko` provider 内统一使用 `_get_with_retry`，默认 `retries=2`、`backoff_seconds=0.4`，针对 `429/5xx` 与网络异常自动重试。
+- 原因：免费行情源短时限流与抖动较常见，直接失败会放大 fallback 频率并导致数据窗口不稳定。
+- 取舍：单次拉取最坏耗时会略有上升，但总体成功率和可复现性更高；重试逻辑保持轻量，避免引入额外依赖。
+
 ## D-200 组合模拟工件命名增加 output_tag
 - 日期：2026-03-16
 - 决策：`simulate-portfolio` 增加 `--output-tag`，并让 `signals/trades/capital/summary` 工件统一追加标签后缀。

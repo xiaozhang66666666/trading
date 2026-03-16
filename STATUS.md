@@ -1,5 +1,18 @@
 # STATUS
 
+## 本轮摘要（2026-03-16 免费数据源重试增强）
+- 当前进展：
+  - 数据接入层新增轻量 HTTP 重试与指数退避：`StooqDailyProvider`、`BinanceSpotProvider`、`CoinGeckoProvider` 在 `429/5xx` 与网络抖动场景下自动重试。
+  - 抽象公共请求函数 `_get_with_retry`，统一超时、重试次数与退避间隔，减少各 provider 重复错误处理代码。
+  - 新增回归测试：
+    - `test_stooq_provider_retries_on_503`（首请求 503，重试后成功）。
+    - `test_binance_provider_retries_on_request_exception`（首请求网络异常，重试后成功）。
+  - 核心数据测试通过：`tests/test_data_manager.py` 全量通过；`tests/test_data_provider_integration.py` 离线分支通过（集成测试按环境变量跳过）。
+- 下一步：
+  1. 把重试参数暴露到 `DataManager` 可配置层（按标的/数据源设置不同重试策略）。
+  2. 补充 README 的“免费源稳定性策略”说明，给出故障排查入口。
+- 阻塞：无。
+
 ## 本轮摘要（2026-03-16 组合模拟恢复审计）
 - 当前进展：
   - `simulate-portfolio` 新增结构化摘要输出：`sim_portfolio_summary_<symbols>_<strategy>.json`（支持 `--summary-file` 覆盖）。

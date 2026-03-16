@@ -15,6 +15,7 @@ Web 登录设计文档：[`docs/WEB_LOGIN_MVP_DESIGN.md`](docs/WEB_LOGIN_MVP_DES
 ## 功能清单
 
 - 统一数据接入层：统一 OHLCV 抽象、历史拉取、增量更新、本地缓存、UTC 时区标准化、免费源多级回退（QQQ: Yahoo->Stooq，ETH: Binance->Yahoo->CoinGecko）
+- 免费源稳定性增强：Stooq/Binance/CoinGecko 请求内置重试与指数退避（应对 `429/5xx` 与瞬时网络抖动）
 - 多标的共同时间轴对齐：`DataManager.get_aligned_history()` 统一裁剪组合研究/模拟的公共区间
 - 周频支持：`--interval 1wk` 采用“日线拉取 + 本地重采样（W-FRI）”，避免依赖外部周线口径差异
 - 数据质量诊断：缺失值、异常价格、OHLC 边界、时间跳点检测与异常行导出

@@ -3,11 +3,38 @@
 from __future__ import annotations
 
 import io
+import time
 import requests
 import pandas as pd
 import yfinance as yf
 
 from market_signal_system.data.base import DataProvider
+
+
+def _get_with_retry(
+    url: str,
+    *,
+    timeout: float,
+    params: dict[str, object] | None = None,
+    retries: int = 2,
+    backoff_seconds: float = 0.4,
+) -> requests.Response:
+    """Small HTTP retry helper for transient free-API failures."""
+    last_error: Exception | None = None
+    attempts = max(0, int(retries)) + 1
+    for attempt in range(attempts):
+        try:
+            resp = requests.get(url, params=params, timeout=timeout)
+            if resp.status_code in {429, 500, 502, 503, 504} and attempt < attempts - 1:
+                time.sleep(backoff_seconds * (2**attempt))
+                continue
+            return resp
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt >= attempts - 1:
+                break
+            time.sleep(backoff_seconds * (2**attempt))
+    raise RuntimeError(f"HTTP request failed after retry: {url}") from last_error
 
 
 class YahooFinanceProvider(DataProvider):
@@ -58,8 +85,10 @@ class StooqDailyProvider(DataProvider):
 
     BASE_URL = "https://stooq.com/q/d/l/"
 
-    def __init__(self, timeout: float = 10.0) -> None:
+    def __init__(self, timeout: float = 10.0, retries: int = 2, backoff_seconds: float = 0.4) -> None:
         self.timeout = timeout
+        self.retries = retries
+        self.backoff_seconds = backoff_seconds
         self.symbol_map = {
             "QQQ": "qqq.us",
         }
@@ -78,10 +107,12 @@ class StooqDailyProvider(DataProvider):
         if interval != "1d":
             raise ValueError(f"StooqDailyProvider unsupported interval: {interval}")
 
-        resp = requests.get(
+        resp = _get_with_retry(
             self.BASE_URL,
             params={"s": self._resolve_symbol(symbol), "i": "d"},
             timeout=self.timeout,
+            retries=self.retries,
+            backoff_seconds=self.backoff_seconds,
         )
         if resp.status_code != 200:
             raise RuntimeError(f"StooqDailyProvider HTTP {resp.status_code}: {resp.text[:200]}")
@@ -112,8 +143,10 @@ class BinanceSpotProvider(DataProvider):
 
     BASE_URL = "https://api.binance.com/api/v3/klines"
 
-    def __init__(self, timeout: float = 10.0) -> None:
+    def __init__(self, timeout: float = 10.0, retries: int = 2, backoff_seconds: float = 0.4) -> None:
         self.timeout = timeout
+        self.retries = retries
+        self.backoff_seconds = backoff_seconds
 
     @staticmethod
     def _map_interval(interval: str) -> str:
@@ -141,7 +174,7 @@ class BinanceSpotProvider(DataProvider):
         cursor = start_ms
 
         while cursor < end_ms:
-            resp = requests.get(
+            resp = _get_with_retry(
                 self.BASE_URL,
                 params={
                     "symbol": symbol.upper(),
@@ -151,6 +184,8 @@ class BinanceSpotProvider(DataProvider):
                     "limit": 1000,
                 },
                 timeout=self.timeout,
+                retries=self.retries,
+                backoff_seconds=self.backoff_seconds,
             )
             if resp.status_code != 200:
                 raise RuntimeError(f"BinanceSpotProvider HTTP {resp.status_code}: {resp.text[:200]}")
@@ -203,8 +238,10 @@ class CoinGeckoProvider(DataProvider):
 
     BASE_URL = "https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range"
 
-    def __init__(self, timeout: float = 10.0) -> None:
+    def __init__(self, timeout: float = 10.0, retries: int = 2, backoff_seconds: float = 0.4) -> None:
         self.timeout = timeout
+        self.retries = retries
+        self.backoff_seconds = backoff_seconds
         self.symbol_map = {
             "ETH": "ethereum",
             "ETHUSD": "ethereum",
@@ -241,7 +278,7 @@ class CoinGeckoProvider(DataProvider):
         if end_utc <= start_utc:
             raise ValueError("end must be greater than start.")
 
-        resp = requests.get(
+        resp = _get_with_retry(
             self.BASE_URL.format(coin_id=coin_id),
             params={
                 "vs_currency": "usd",
@@ -249,6 +286,8 @@ class CoinGeckoProvider(DataProvider):
                 "to": int(end_utc.timestamp()),
             },
             timeout=self.timeout,
+            retries=self.retries,
+            backoff_seconds=self.backoff_seconds,
         )
         if resp.status_code != 200:
             raise RuntimeError(f"CoinGeckoProvider HTTP {resp.status_code}: {resp.text[:200]}")

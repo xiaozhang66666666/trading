@@ -58,6 +58,7 @@ class PaperBroker:
         self.trades: list[Trade] = []
         self._entry_times: dict[str, str] = {}
         self._last_processed_at: dict[str, str] = {}
+        self._skipped_duplicate_bars: dict[str, int] = {}
 
         if self.state_path.exists():
             self.load_state()
@@ -72,6 +73,7 @@ class PaperBroker:
     ) -> None:
         normalized_ts = self._normalize_timestamp(timestamp)
         if self._is_duplicate_bar(symbol=symbol, timestamp=normalized_ts):
+            self._mark_duplicate_skip(symbol)
             return
 
         target_side = int(max(-1, min(1, signal)))
@@ -125,6 +127,8 @@ class PaperBroker:
             "return_pct": return_pct,
             "positions": {k: asdict(v) for k, v in self.positions.items()},
             "trade_count": len(self.trades),
+            "skipped_duplicate_bars_total": int(sum(self._skipped_duplicate_bars.values())),
+            "skipped_duplicate_bars_by_symbol": dict(self._skipped_duplicate_bars),
         }
 
     def save_state(self) -> None:
@@ -138,6 +142,7 @@ class PaperBroker:
             "trades": [asdict(t) for t in self.trades],
             "entry_times": self._entry_times,
             "last_processed_at": self._last_processed_at,
+            "skipped_duplicate_bars": self._skipped_duplicate_bars,
         }
         self.state_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -159,6 +164,10 @@ class PaperBroker:
             str(symbol): self._normalize_timestamp(str(ts))
             for symbol, ts in payload.get("last_processed_at", {}).items()
         }
+        self._skipped_duplicate_bars = {
+            str(symbol): int(value)
+            for symbol, value in payload.get("skipped_duplicate_bars", {}).items()
+        }
 
     def _is_duplicate_bar(self, symbol: str, timestamp: str) -> bool:
         last_ts = self._last_processed_at.get(symbol)
@@ -175,6 +184,9 @@ class PaperBroker:
         else:
             dt = dt.astimezone(timezone.utc)
         return dt.isoformat()
+
+    def _mark_duplicate_skip(self, symbol: str) -> None:
+        self._skipped_duplicate_bars[symbol] = int(self._skipped_duplicate_bars.get(symbol, 0)) + 1
 
     def _open_position(
         self,

@@ -4,6 +4,7 @@
 - 当前进展：
   - `PaperBroker` 新增“按标的记录最后处理时间”的状态字段 `last_processed_at`，并持久化到 `data/state/*.json`。
   - `simulate` 在加载历史状态后，若重跑同一时间窗口会自动跳过已处理 bar，避免重复开平仓、重复手续费与重复交易日志。
+  - `snapshot/sim_summary` 新增恢复审计字段：`skipped_duplicate_bars_total`、`skipped_duplicate_bars_by_symbol`，可直接看出重放区间被跳过的 bar 数量。
   - 新增回归 `test_cmd_simulate_replay_same_window_is_idempotent`，锁定“同窗口重放不重复记账”。
   - 保留原有恢复语义：分段续跑（例如先到 `T1`，再到 `T2`）仍可继续产生新增交易，相关离线冒烟保持通过。
 - 下一步：

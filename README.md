@@ -314,6 +314,7 @@ python3 scripts/smoke_simulate_resume.py
 - `outputs/sim_trades_<symbol>_<strategy>.csv`（若有成交）
 - `outputs/sim_equity_<symbol>_<strategy>.csv`（逐 bar 资金曲线，含持仓快照列：`position_side/position_quantity/position_entry_price/position_mark_price/position_unrealized_pnl`）
 - `outputs/sim_summary_<symbol>_<strategy>.json`（结构化快照：持仓/浮盈/已实现/累计收益）
+  - 快照附带恢复幂等审计字段：`skipped_duplicate_bars_total`、`skipped_duplicate_bars_by_symbol`
 
 ### 4) Signal Pilot（信号观察台账）
 

@@ -36,6 +36,8 @@ def test_broker_state_persistence(tmp_path):
     assert "total_fees" in snap
     assert "total_slippage" in snap
     assert "return_pct" in snap
+    assert "skipped_duplicate_bars_total" in snap
+    assert "skipped_duplicate_bars_by_symbol" in snap
 
 
 def test_broker_supports_shared_account_multi_symbols(tmp_path):
@@ -296,3 +298,6 @@ def test_cmd_simulate_replay_same_window_is_idempotent(tmp_path, monkeypatch):
     second.state_path = tmp_path / "state" / "idempotent_state.json"
     second.load_state()
     assert len(second.trades) == first_trade_count
+    second_snap = second.snapshot()
+    assert second_snap["skipped_duplicate_bars_total"] > 0
+    assert second_snap["skipped_duplicate_bars_by_symbol"]["QQQ"] > 0

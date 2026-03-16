@@ -70,6 +70,13 @@ python3 scripts/bootstrap_project.py --dev --mode pyproject
 python3 scripts/bootstrap_project.py --check-sync
 ```
 
+压缩 `STATUS.md/DECISIONS.md` 并归档历史（默认 dry-run）：
+
+```bash
+python3 scripts/compact_project_docs.py --keep-sections 8
+python3 scripts/compact_project_docs.py --keep-sections 8 --apply
+```
+
 ## 推送到 GitHub（当前仓库）
 
 已内置推送脚本（推送前会检查仓库是否 clean）：

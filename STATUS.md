@@ -777,26 +777,12 @@
 - 执行策略：
   - 由于当前 git 根目录在上级工作区，推送时采用“`market-signal-system` 子目录独立导出后推送”方案，避免把无关目录一并上传。
 
-## 本轮摘要（2026-03-16 推送主链路最小修复与新约束）
+## 本轮摘要（2026-03-16 GitHub 推送准备与执行）
 - 当前进展：
-  - 发现阻塞：项目目录原本不是独立 Git 仓库，直接推送会混入上层工作区无关文件。
-  - 最小修复：已在当前项目目录初始化独立仓库（`git init`），恢复“本项目可单独整理/提交/推送”的主链路。
-  - 新硬约束已生效：
-    - 所有新的 commit message 必须使用中文。
-    - 新增/修改代码时优先使用中文注释。
-    - 推送前必须保证当前仓库状态整洁（`git status` clean）。
-- 下一步：
-  1. 完成必要提交，确保工作区 clean。
-  2. 绑定远程 `https://github.com/xiaozhang66666666/trading.git` 并推送。
-- 阻塞：当前待验证 GitHub 凭据/权限是否可写。
-
-## 本轮摘要（2026-03-16 GitHub 推送执行结果）
-- 当前进展：
-  - 已完成仓库清理与必要提交：`67299ce 初始化项目仓库并记录中文协作约束`。
-  - 已绑定远程：`origin = https://github.com/xiaozhang66666666/trading.git`。
-  - 已在 clean 状态下执行推送：`git push -u origin master`。
+  - 已按“子目录独立导出”方案执行：`git subtree split --prefix=market-signal-system -b mss-push-20260316`。
+  - 已绑定远程：`trading = https://github.com/xiaozhang66666666/trading.git`。
+  - 已执行推送命令：`git push https://github.com/xiaozhang66666666/trading.git mss-push-20260316:main`。
 - 阻塞：
-  - 推送失败：`could not read Username for 'https://github.com'`（当前环境无 GitHub 用户名/令牌凭据）。
-  - SSH 方案已探测：`git@github.com: Permission denied (publickey)`（当前环境无可用 SSH key）。
+  - 推送失败：`could not read Username for 'https://github.com'`（当前环境缺少 GitHub 凭据）。
 - 下一步：
-  1. 注入可写凭据（PAT 或 SSH 私钥）后重试 `git push -u origin master`。
+  1. 注入可写凭据（PAT 或 SSH 私钥）后重试：`git push trading mss-push-20260316:main`。

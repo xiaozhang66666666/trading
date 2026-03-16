@@ -64,6 +64,12 @@ source .venv/bin/activate
 python3 scripts/bootstrap_project.py --dev --mode pyproject
 ```
 
+校验 `pyproject.toml` 与 `requirements*.txt` 依赖是否一致：
+
+```bash
+python3 scripts/bootstrap_project.py --check-sync
+```
+
 ## 推送到 GitHub（当前仓库）
 
 已内置推送脚本（推送前会检查仓库是否 clean）：

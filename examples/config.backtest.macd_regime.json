@@ -1,0 +1,15 @@
+{
+  "command": "backtest",
+  "symbol": "QQQ",
+  "strategy": "macd_regime",
+  "start": "2018-01-01",
+  "end": "2025-01-01",
+  "params": {
+    "fast_span": 24,
+    "slow_span": 52,
+    "signal_span": 18,
+    "macd_ratio_threshold": 0.0005
+  },
+  "fee_rate": 0.0008,
+  "slippage_bps": 5.0
+}

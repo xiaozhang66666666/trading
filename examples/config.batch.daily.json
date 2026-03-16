@@ -1,0 +1,9 @@
+{
+  "command": "batch",
+  "tasks": [
+    "config.fetch.qqq.json",
+    "config.fetch.eth.json",
+    "config.compare.json",
+    "config.report.json"
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "command": "stability",
+  "walk_forward_file": "outputs/walk_forward_QQQ_donchian.csv"
+}

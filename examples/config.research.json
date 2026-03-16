@@ -1,0 +1,14 @@
+{
+  "command": "research",
+  "symbol": "QQQ",
+  "strategy": "donchian",
+  "start": "2018-01-01",
+  "end": "2025-01-01",
+  "objective": "sharpe",
+  "train_bars": 504,
+  "test_bars": 126,
+  "grid": {
+    "lookback": [40, 55],
+    "exit_lookback": [15, 20]
+  }
+}

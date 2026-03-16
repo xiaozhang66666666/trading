@@ -1,0 +1,30 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "vars": {
+    "as_of": "2026-03-16"
+  },
+  "tasks": [
+    {
+      "file": "config.signal_pilot.scan.json",
+      "vars": {
+        "as_of": "${as_of}"
+      }
+    },
+    {
+      "file": "config.signal_pilot.dispatch.json"
+    },
+    {
+      "file": "config.signal_pilot.update.json",
+      "vars": {
+        "as_of": "${as_of}"
+      }
+    },
+    {
+      "file": "config.signal_pilot.report.json",
+      "vars": {
+        "as_of": "${as_of}"
+      }
+    }
+  ]
+}

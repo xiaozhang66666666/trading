@@ -1,0 +1,16 @@
+{
+  "command": "backtest",
+  "symbol": "QQQ",
+  "strategy": "dual_momentum",
+  "start": "2020-01-01",
+  "end": "2025-01-01",
+  "params": {
+    "fast_window": 63,
+    "slow_window": 252,
+    "regime_window": 200,
+    "volatility_window": 21,
+    "fast_threshold": 0.02,
+    "slow_threshold": 0.06,
+    "volatility_quantile": 0.8
+  }
+}

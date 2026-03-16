@@ -1,0 +1,25 @@
+{
+  "command": "batch",
+  "vars": {
+    "start": "2020-01-01",
+    "end": "2025-01-01"
+  },
+  "tasks": [
+    {
+      "command": "update-cache",
+      "symbols": "QQQ,ETH",
+      "start": "${start}",
+      "end": "${end}"
+    },
+    {
+      "command": "mvp",
+      "start": "${start}",
+      "end": "${end}",
+      "run_tag": "refresh_mvp_daily"
+    },
+    {
+      "command": "report",
+      "output_file": "refresh_mvp_daily_report_index.md"
+    }
+  ]
+}

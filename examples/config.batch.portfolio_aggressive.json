@@ -1,0 +1,65 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "vars": {
+    "start": "2020-01-01",
+    "end": "2025-01-01",
+    "symbols": "QQQ,ETH",
+    "strategy": "momentum",
+    "tag": "aggressive"
+  },
+  "summary_json": "batch_${tag}_summary.json",
+  "summary_csv": "batch_${tag}_summary.csv",
+  "tasks": [
+    {
+      "command": "fetch",
+      "symbol": "QQQ",
+      "start": "${start}",
+      "end": "${end}"
+    },
+    {
+      "command": "fetch",
+      "symbol": "ETH",
+      "start": "${start}",
+      "end": "${end}"
+    },
+    {
+      "command": "portfolio",
+      "symbols": "${symbols}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "allocation_mode": "cov_vol_target",
+      "target_vol": 0.2,
+      "max_leverage": 1.8,
+      "corr_watch_threshold": 0.78,
+      "corr_high_threshold": 0.9,
+      "crowding_watch_threshold": 0.16,
+      "crowding_high_threshold": 0.24,
+      "drift_watch_threshold": 0.1,
+      "drift_high_threshold": 0.18,
+      "rebalance_on_drift": true,
+      "rebalance_trigger": "watch",
+      "rebalance_scale": 1.2
+    },
+    {
+      "command": "simulate-portfolio",
+      "symbols": "${symbols}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "allocation_per_signal": 0.4,
+      "max_symbol_allocation": 0.45,
+      "max_total_allocation": 1.15,
+      "initial_margin_rate": 0.75,
+      "cash_reserve_ratio": 0.03,
+      "max_portfolio_drawdown": 0.22,
+      "risk_cooldown_bars": 12,
+      "state_file": "paper_portfolio_${tag}.json"
+    },
+    {
+      "command": "report",
+      "output_file": "report_index_${tag}.md"
+    }
+  ]
+}

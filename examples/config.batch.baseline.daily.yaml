@@ -1,0 +1,29 @@
+command: batch
+on_error: continue
+vars:
+  start: "2020-01-01"
+  end: "2025-01-01"
+  as_of: "2026-03-16"
+summary_json: baseline_daily_summary.json
+summary_csv: baseline_daily_summary.csv
+tasks:
+  - file: config.mvp.json
+    vars:
+      start: "${start}"
+      end: "${end}"
+  - file: config.signal_pilot.scan.json
+    vars:
+      as_of: "${as_of}"
+  - file: config.signal_pilot.dispatch.json
+  - file: config.signal_pilot.update.json
+    vars:
+      as_of: "${as_of}"
+  - file: config.signal_pilot.report.json
+    vars:
+      as_of: "${as_of}"
+  - command: report
+    output_file: baseline_daily_report_index.md
+  - command: baseline-summary
+    output_json: baseline_daily_digest.json
+    output_csv: baseline_daily_digest.csv
+    report_index_file: baseline_daily_report_index.md

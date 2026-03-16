@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-signal-system"
+version = "0.1.0"
+description = "中长线行情分析、回测与模拟交易系统"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Market Signal Team" }]
+dependencies = [
+  "pandas>=2.2.0",
+  "numpy>=1.26.0",
+  "yfinance>=0.2.40",
+  "requests>=2.32.0",
+  "PyYAML>=6.0.0",
+  "fastapi>=0.116.0",
+  "uvicorn>=0.35.0",
+  "Jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "httpx>=0.28.0",
+]
+
+[project.scripts]
+mss = "market_signal_system.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "integration: real network integration tests (disabled by default)",
+]

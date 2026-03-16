@@ -1,0 +1,17 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "compress_naming": "strict",
+  "summary_compress": "gzip",
+  "summary_json": "strict_batch_summary.json.gz",
+  "summary_csv": "strict_batch_summary.csv.gz",
+  "retry_budget_trace_compress": "gzip",
+  "retry_budget_trace_csv": "strict_retry_budget_trace.csv.gz",
+  "max_total_retries": 2,
+  "tasks": [
+    {
+      "command": "report",
+      "output_file": "strict_compress_report.md"
+    }
+  ]
+}

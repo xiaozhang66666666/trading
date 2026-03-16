@@ -1,0 +1,791 @@
+# STATUS
+
+## 本轮摘要（2026-03-16 Web 登录 MVP）
+- 当前进展：
+  - `appdb` 已补 PostgreSQL 占位层：`PostgresConnectionFactory/PostgresSchemaManager/PostgresAuthRepository/PostgresSignalPilotRepository`（当前明确抛 `NotImplementedError`，用于迁移落点与接口约束）。
+  - 新增占位回归：`tests/test_appdb_postgres_placeholder.py`，锁定“可导入 + 明确失败语义”。
+  - Web 登录/退出新增 CSRF 防护：`/login` 与 `/logout` 均要求表单 token 与 cookie token 匹配，不匹配返回 `400`。
+  - 登录页与仪表盘模板已注入隐藏字段 `csrf_token`，并新增回归 `test_web_login_rejects_invalid_csrf`。
+  - Web 登录新增失败限流：按 `ip+username` 做滑动窗口计数，默认 `5 次/300 秒`，超阈值返回 `429`。
+  - `create_app` 新增限流参数：`login_rate_limit_max_attempts/login_rate_limit_window_seconds`，`run_web.py` 与 `.env.web.example` 已同步支持。
+  - 新增回归：`test_web_login_rate_limit_blocks_after_failures`，验证阈值触发与拦截状态码。
+  - `mvp` 命令新增“最低标准验收摘要”输出：`mvp_summary` 里新增 `mvp_acceptance`，覆盖 `QQQ+ETH` 覆盖、策略数量、回测/模拟数量、模拟快照字段完整性、信号取值三态与多空空仓覆盖检查。
+  - `mvp` 新增 `--strict-acceptance`：验收未通过时返回非零退出码，便于批处理/CI 守门；默认仍保持“只写摘要不失败”。
+  - 新增回归：`test_mvp_cli_strict_acceptance_fails_when_not_covering_short_signal`，并扩展 `test_mvp_cli_runs_end_to_end_via_subprocess_without_network` 校验验收字段结构。
+  - 已完成 Web 登录 MVP：预置账号脚本、登录页、session/cookie 鉴权、账号隔离的 Signal Pilot 仪表盘。
+  - `admin_seed_account.py` 与 `run_web.py` 已支持无 `PYTHONPATH` 直接运行（脚本内自动注入 `src/`）。
+  - Web 鉴权 API 已稳定：`/api/me` 与 `/api/signal-pilot/alerts` 均按登录账号做隔离。
+  - 已新增数据库抽象分层：`appdb.models` + `repositories` + `services` + `sqlite_backend`，SQL 集中在 SQLite 实现层。
+  - 已新增专项设计文档：`docs/WEB_LOGIN_MVP_DESIGN.md`（schema、鉴权、迁移策略、扩展路线）。
+  - 已新增/增强回归测试：`tests/test_appdb_auth.py`、`tests/test_web_auth.py`、`tests/test_admin_seed_account_script.py`、`tests/test_run_web_script.py`。
+  - 本次补充提交：
+    - `e21939f`：增强 Web API 鉴权隔离回归（`/api/me` + `/api/signal-pilot/alerts`）。
+    - `e7edf52`：更新 Web 登录运行说明与设计文档（无 `PYTHONPATH` 直接启动）。
+- 距离“可部署”仍差步骤（明确清单）：
+  - [x] 反向代理与 TLS：已补 Nginx 配置样例与 `MSS_COOKIE_SECURE` 开关。
+  - [x] 运维能力：已补 systemd 启动模板。
+  - 生产配置：统一 `.env` 或配置文件管理（会话 TTL、DB 路径、日志等级）。
+  - 安全增强：CSRF 防护、登录失败限流、审计日志（登录成功/失败）。
+  - 数据迁移：补 PostgreSQL/MySQL repository 骨架与迁移脚本样例。
+- 下一步：
+  1. 补生产配置收敛（统一 `.env` 的会话 TTL/日志等级/DB 路径）。
+  2. 评估登录/鉴权审计日志（成功/失败）最小落盘方案。
+  3. 规划 PostgreSQL 真正实现所需迁移脚本与连接池依赖。
+- 阻塞：无。
+
+## 当前进展
+- [x] 读取任务书并拆解里程碑
+- [x] 项目脚手架与依赖管理（`pyproject.toml` + `requirements`）
+- [x] 数据接入层（QQQ + ETH，统一接口、增量更新、缓存、UTC 标准化）
+- [x] SQLite 存储层 MVP（`accounts/signal_alerts/notification_dispatch_records/sim_state_meta` schema）
+- [x] Signal Pilot 台账切换为“SQLite 优先 + CSV 兼容镜像”
+- [x] Signal Pilot 多账号隔离（`account_id` 命名空间）接入 `scan/dispatch/update/report`
+- [x] 模拟状态元数据入库（`sim_state_meta`，`simulate/simulate-portfolio`）
+- [x] 周频数据支持（`interval=1wk`，基于日线缓存重采样 `W-FRI`，复用免费源与增量缓存）
+- [x] 新增中长线策略 `dual_momentum`（双周期动量共振 + 趋势/波动率过滤，支持多空/空仓）
+- [x] 策略接入收敛：`cli` 使用统一 `STRATEGY_CHOICES` 常量，减少重复白名单维护风险
+- [x] 新增 `dual_momentum` 单策略回测/研究模板与解析回归（`examples/config.backtest.dual_momentum.json`、`examples/config.research.dual_momentum.json`）
+- [x] 数据层新增多标的对齐接口 `DataManager.get_aligned_history`（统一共同时间轴裁剪）
+- [x] 组合链路接入统一对齐层：`portfolio` 回测与 `simulate-portfolio` 不再重复手写时间轴交集逻辑
+- [x] 兼容性兜底：当外部 `data_manager`（测试 fake/stub）未实现 `get_aligned_history` 时自动回退到旧逻辑，避免破坏既有测试注入
+- [x] QQQ 免费源增强（Yahoo `QQQ` 主源 + Stooq `qqq.us` 回退）
+- [x] ETH 免费源增强（Binance `ETHUSDT` 主源 + Yahoo `ETH-USD` 回退）
+- [x] Binance 真实网络集成测试（默认跳过，`RUN_BINANCE_INTEGRATION=1` 显式开启）
+- [x] 基础回测引擎（多空/空仓、手续费、滑点、绩效指标）
+- [x] 回测输出标签（`backtest --output-tag`）支持同策略多参数批处理工件并存
+- [x] 首批策略（3 个中长线策略）
+- [x] 新增中长线策略 `macd_regime`（MACD 趋势确认 + regime/波动率过滤，支持多空/空仓）
+- [x] 模拟交易核心（开平仓、持仓、浮盈、已实现收益、累计收益、状态持久化）
+- [x] 模拟交易摘要工件（`sim_summary_<symbol>_<strategy>.json`，结构化落盘持仓/浮盈/已实现/累计收益）
+- [x] 模拟交易重启恢复端到端回归（`cmd_simulate` 连续运行可加载并延续历史状态）
+- [x] 新增 `macd_regime` 研究模板（`examples/config.research.macd_regime.json`）与对比模板接入
+- [x] 新增 `macd_regime` 参数敏感性批处理模板（`examples/config.batch.macd_sensitivity.json`）
+- [x] 新增模拟交易恢复批处理模板（`examples/config.batch.simulate_resume.json`，同一状态文件分段续跑）
+- [x] 新增 `output_tag` 对照批处理模板（`examples/config.batch.output_tag_compare.json`，同策略多参数命名规范示例）
+- [x] 新增 `simulate` 恢复离线冒烟脚本（`scripts/smoke_simulate_resume.py`，自动校验状态延续与交易条数递增）
+- [x] README 启动说明与策略文档
+- [x] 基础测试与冒烟验证
+- [x] 参数化研究能力（参数网格搜索 + walk-forward 滚动验证）
+- [x] 多策略排行榜导出（跨标的批量回测 + 综合评分）
+- [x] 配置文件驱动执行（`run-config` + JSON 示例模板）
+- [x] 回测风控增强（最大回撤触发空仓 + 冷却期）
+- [x] 信号可解释导出（回测与模拟交易均输出 reason 日志）
+- [x] 组合能力 MVP（多标的等权组合回测 CLI）
+- [x] 自动化报告索引（outputs 汇总 Markdown）
+- [x] 组合风险预算增强（风险平价 + 目标波动率仓位）
+- [x] 组合账户模拟交易（多标的共享资金）
+- [x] 组合风险归因导出（收益/波动/换手贡献）
+- [x] 参数稳定性分析导出（walk-forward 频次与摘要）
+- [x] 组合模拟风险限额（单标的上限、总仓位上限、回撤触发平仓+冷却）
+- [x] 组合协方差风险预算（`cov_risk_parity` / `cov_vol_target`）
+- [x] 组合相关性与拥挤度告警导出（`portfolio_alerts_*.csv`）
+- [x] 组合模拟风控回归测试（回撤强平 + 冷却阻断）
+- [x] 组合权重明细导出（`portfolio_weights_*.csv`）
+- [x] 组合告警阈值配置化（相关性/拥挤度 watch/high 可通过 CLI 与配置文件注入）
+- [x] 组合模拟资金约束回归测试（总仓位耗尽阻断、连续反转链路）
+- [x] 组合权重偏移统计导出（`portfolio_drift_*.csv`，目标权重 vs 漂移后权重）
+- [x] 组合漂移告警阈值配置化（`drift watch/high` 支持 CLI 与配置文件注入）
+- [x] 组合模拟资金占用增强（保证金率 + 现金保留比例约束）
+- [x] 组合告警阈值模板扩展（strict/loose + 保证金模拟配置）
+- [x] 组合模拟资金快照导出（权益/总暴露/保证金/预留现金）
+- [x] `run-config` 批处理清单（batch tasks 串行执行，支持文件引用与内联任务）
+- [x] 报告索引新增组合资金占用摘要（平均暴露率/平均与峰值保证金利用率/平均预留现金占比）
+- [x] 组合漂移告警与再平衡动作联动实验（额外换手/成本注入 + 工件导出）
+- [x] 批处理场景端到端示例（`fetch + portfolio + simulate-portfolio + report`）
+- [x] `run-config` 批处理错误策略（`fail_fast/continue`）与失败汇总
+- [x] 组合再平衡实验跨文件排名（按单次触发平均成本给出 best/worst）
+- [x] 主链路修复：`run-config` 在 `on_error=continue` 下失败任务继续执行，但末尾统一抛出汇总异常
+- [x] `run-config` 批处理执行摘要导出（`summary_json` / `summary_csv`）
+- [x] portfolio/simulate-portfolio 一体化批处理模板（统一参数占位符）
+- [x] `run-config` 批处理执行摘要增强（默认输出 + 时间字段 `started_at/ended_at/duration_ms`）
+- [x] `run-config` `on_error=continue` 回归：失败后继续执行并在末尾抛出汇总异常（避免 CI 静默成功）
+- [x] 占位符异常路径回归（缺失变量时报错）
+- [x] 批处理模板增加“保守/激进”两档预设（`config.batch.portfolio_conservative/aggressive.json`）
+- [x] 批处理摘要增加整次运行耗时字段（`run_started_at/run_ended_at/run_duration_ms`）
+- [x] 占位符/摘要参数异常回归（`tasks[].vars`、`tasks.file.vars`、`summary_*` 非法类型）
+- [x] `report` 汇总批处理执行摘要（按 `run_id` 展示成功失败计数、总耗时、最慢任务）
+- [x] 新增保守/激进模板对比说明文档（`BATCH_PRESETS.md`）
+- [x] `run-config` 批处理任务重试策略（`retry_count` + `retry_delay_ms`）与尝试次数落盘
+- [x] 主链路紧急修复：`on_error=continue` 测试口径回归到“末尾抛汇总异常”
+- [x] 批处理重试细化：支持仅重试可重试错误 + 任务级 `retry` 覆盖
+- [x] 报告增强：批处理失败命令 TopN（`failed_top_commands`）
+- [x] 报告增强：批处理跨文件聚合统计（全量 + 近 N 次失败率/耗时分布）
+- [x] 报告增强：批处理重试效率聚合（`retry_hit_rate` / `total_retries_used` / `non_retryable_fail_share`）
+- [x] 批处理重试预算保护（`max_total_retries` 跨任务共享预算）
+- [x] 保守/激进预设一键对比脚本（自动产出 CSV + Markdown）
+- [x] 主链路最小修复：预设对比脚本在批处理失败时不再静默成功（非零退出码立即报错）
+- [x] 批处理重试预算轨迹导出（`retry_budget_trace_csv`）
+- [x] 预设对比脚本支持 `--start/--end` 动态注入（无需改配置文件）
+- [x] 报告新增 `preset_compare` 工件摘要（自动输出激进-保守关键差值）
+- [x] 报告新增重试预算轨迹摘要（耗尽事件 + 平均预算消耗 + aggregate）
+- [x] 报告新增预算轨迹跨 run 趋势聚合（最近 N 次 run 耗尽率/失败率）
+- [x] `compare_batch_presets.py` 冒烟回归补齐（`--start/--end` 成功路径）
+- [x] `preset_compare` 产出时间戳快照，报告支持 latest/prev gap 历史对比
+- [x] 预算轨迹摘要新增失败分布指标（`failed_rows/failed_ratio/depleted_failed`）
+- [x] 预算轨迹摘要新增耗尽命令分布（`depleted_top_commands` + `aggregate_depleted_top_commands`）
+- [x] `compare_batch_presets.py` 工件结构回归（CSV/MD 存在性与关键列）
+- [x] `preset_compare` 历史快照清理策略（默认保留最近 20 份，可参数化）
+- [x] 主链路修复：`scripts/compare_batch_presets.py` 支持无 `PYTHONPATH` 直接执行
+- [x] 报告新增预设对比趋势聚合（最近 N 次快照的 avg/min/max gap 与 improving_ratio）
+- [x] `run-config` 批处理摘要支持压缩输出（`summary_compress=none/gzip`）
+- [x] `report` 批处理摘要兼容读取 `.json.gz` 工件
+- [x] `preset_compare` 快照清理支持日期窗口（`--snapshot-keep-start/--snapshot-keep-end`）
+- [x] 主链路修复：支持无 `PYTHONPATH` 直接 `python3 -m market_signal_system ...`
+- [x] 重试预算轨迹支持压缩输出（`retry_budget_trace_compress=none/gzip`）并兼容报告读取 `.csv.gz`
+- [x] 预设快照清理统计落盘（`preset_compare_cleanup_latest.json`）并在报告输出 `cleanup.latest`
+- [x] 本轮主链路复验通过：`python3 -m market_signal_system --help` 与全量测试 `108 passed, 1 skipped`
+- [x] `preset_compare` 新增维护模式（`--cleanup-only`，仅清理快照不生成对比表）
+- [x] 批处理压缩工件新增统一命名策略（`compress_naming=auto_suffix/strict`）
+- [x] 主链路最小修复：`compare_batch_presets.py` 对非法快照日期参数输出 CLI 友好错误（无 Python 堆栈）
+- [x] 报告新增 `cleanup.latest` 执行时间提示（显示 `generated_at`）
+- [x] 新增严格压缩命名示例模板（`examples/config.batch.daily.strict_gzip.json`）
+- [x] 新增严格命名 + 预算轨迹压缩模板（`examples/config.batch.daily.strict_gzip_trace.json`）
+- [x] 新增 strict 模式预算轨迹 `.gz` 后缀校验回归（成功/失败路径）
+- [x] 主链路最小修复：`--cleanup-only` 模式仅输出清理诊断路径，不再误报 `CSV/Markdown` 产物
+- [x] 快照清理诊断新增历史工件（`preset_compare_cleanup_<timestamp>.json`）
+- [x] 报告新增 `cleanup.aggregate_last_N_runs`（清理执行时间与清理量趋势）
+- [x] 新增 strict 失败演示模板与脚本（`config.batch.strict_failure_demo.json` + `demo_strict_failure_report.py`）
+- [x] 清理诊断历史新增保留窗口（`--keep-cleanup-history`，默认 50）
+- [x] strict 失败演示接入预设文档（`BATCH_PRESETS.md` 新增复盘 checklist）
+- [x] cleanup 历史聚合异常容错（非法数字/缺失字段安全降级）与回归测试
+- [x] cleanup 聚合可观测性增强（`skipped_invalid_time` + `rows_with_invalid_numeric`）
+- [x] strict 失败演示脚本内容级回归（校验 summary/report 工件存在与关键段落）
+- [x] README 报告说明补齐 cleanup 异常计数字段口径
+- [x] cleanup 趋势摘要新增异常率与样本规模（`history_files/valid_runs/abnormal_ratio`）
+- [x] 新增 `score_regime` 中长线策略（多指标加权评分 + 波动率过滤），支持多空/空仓并接入 CLI/compare 默认策略集
+- [x] 策略回归新增 `test_score_regime_signal_shape`，锁定 `signal/explain` 输出契约
+- [x] 新增 `score_regime` 研究模板（`examples/config.research.score_regime.json`）并接入 README 启动命令
+- [x] 新增 `compare` 子进程离线回归（默认策略集含 `score_regime`，无 `PYTHONPATH` 可运行）
+- [x] 新增 `score_regime` 单策略回测模板（`examples/config.backtest.score_regime.json`）并接入 README 命令清单
+- [x] 新增 `score_regime` 稳定性流水线模板（`research + stability + report` 批处理串联）
+- [x] 新增 `score_regime` vs `macd_regime` 专项对照模板（同窗回测 + compare + report）
+- [x] 补充 `score_regime/macd_regime` 参数建议区间（`STRATEGIES.md`，与专项模板默认参数对齐）
+- [x] 新增 ETH 版本 `score_vs_macd` 专项模板并补双模板解析回归（QQQ/ETH）
+- [x] 新增专项对照一键脚本（`scripts/run_score_vs_macd.py`，支持 `--symbol qqq|eth`）
+- [x] `report` 新增策略对照摘要（自动汇总 `score_regime` vs `macd_regime` 关键差值）
+- [x] `run_score_vs_macd.py` 新增 `--start/--end` 覆盖参数与 `--no-run` 巡检模式（临时配置落盘 + 命令预览）
+- [x] `run_score_vs_macd.py` 新增 `--report-file` 覆盖参数（按运行时改写 report 输出名，避免覆盖）
+- [x] `run_score_vs_macd.py` 新增 `--print-config`（巡检时直接输出渲染后的 batch JSON）
+- [x] `run_score_vs_macd.py` 失败路径子进程回归（非零退出时脚本返回 1 且错误信息稳定）
+- [x] `run_score_vs_macd.py` 新增 `--keep-temp-config`（真实执行后可保留渲染配置）
+- [x] `run_score_vs_macd.py` 新增 `--report-tag`（为报告名追加标签后缀，默认 UTC 时间戳）
+- [x] `run_score_vs_macd.py` 新增 `--emit-config`（渲染配置可落盘到指定路径并直接执行）
+- [x] 新增脚本回归：覆盖 `--report-tag`（显式/自动）与 `--emit-config` 输出契约
+- [x] `run_score_vs_macd.py` 新增 `--report-dir`（仅替换报告输出目录，保留文件名，可与 `--report-tag` 叠加）
+- [x] 新增脚本回归：覆盖 `--report-dir` 单独使用与 `--report-tag` 叠加场景
+- [x] `run_score_vs_macd.py` 新增参数冲突校验：阻断 `--no-run+--dry-run`、`--keep-temp-config+--emit-config` 等无效组合
+- [x] 新增脚本回归：覆盖参数冲突错误码与错误文案稳定性
+- [x] `run_score_vs_macd.py` 新增 `{ts}` 占位符与 `--keep-emitted-configs`（渲染配置历史保留窗口，旧文件移入 `.trash`）
+- [x] 新增脚本回归：覆盖 `--keep-emitted-configs` 约束校验与历史清理行为
+- [x] `run_score_vs_macd.py` 新增 `--report-prefix`（统一报告文件名前缀，可与 `--report-tag/--report-dir` 叠加）
+- [x] 新增脚本回归：覆盖 `--report-prefix` 独立与叠加 `--report-tag` 场景，并校验空前缀报错
+- [x] `run_score_vs_macd.py` 新增 `--emit-config-dir`（自动生成 `score_vs_macd_<symbol>_{ts}.json`，减少手工路径模板）
+- [x] 新增脚本回归：覆盖 `--emit-config-dir` 输出契约、参数冲突与历史清理行为
+- [x] `run_score_vs_macd.py` 新增 `--emit-prefix`（仅作用于 `--emit-config-dir` 自动命名，支持同目录多专题并存）
+- [x] 新增脚本回归：覆盖 `--emit-prefix` 生效路径与空值/误用参数校验
+- [x] `run_score_vs_macd.py` 新增 `--emit-tag`（仅作用于 `--emit-config-dir` 自动命名，支持批次后缀检索）
+- [x] 新增脚本回归：覆盖 `--emit-tag` 生效路径、与 `--emit-prefix` 叠加命名、空值/误用参数校验
+- [x] 新增脚本回归：覆盖 `--emit-prefix + --emit-tag + --keep-emitted-configs` 联动清理路径
+- [x] `run_score_vs_macd.py` 新增命名字符集约束：`--emit-prefix/--emit-tag` 禁止路径分隔符
+- [x] 新增脚本回归：覆盖 `--emit-prefix/--emit-tag` 路径分隔符误用报错
+- [x] 新增命名约定模板 `examples/config.batch.score_vs_macd_naming_demo.json`（统一 `output_tag/report` 命名）
+- [x] 新增 ETH 命名约定模板 `examples/config.batch.score_vs_macd_naming_demo.eth.json`（跨资产复用同一命名规范）
+- [x] `run_score_vs_macd.py` 新增 `--emit-separator`（默认 `_`，支持目录级渲染配置命名风格统一）
+- [x] 新增脚本回归：覆盖 `--emit-separator` 生效路径与误用参数校验
+- [x] `run_score_vs_macd.py` 新增 `--emit-template`（目录级自定义文件名模板，支持 `{symbol}/{ts}` 占位符）
+- [x] 新增脚本回归：覆盖 `--emit-template` 生效路径、参数冲突与占位符校验
+- [x] 抽取渲染配置命名工具模块（`utils/emit_naming.py`），统一 `emit prefix/tag/template/separator` 校验与文件名拼接
+- [x] `run_score_vs_macd.py` 新增 `--naming-demo`：快速切换命名演示模板，并默认只渲染不执行
+- [x] `run_score_vs_macd.py` 新增 `--run`：显式覆盖 `--naming-demo` 默认 no-run，避免执行意图歧义
+- [x] 回测新增买入持有基准对比指标：`benchmark_total_return/excess_total_return/information_ratio/active_max_drawdown`
+- [x] 报告索引增强：单策略回测摘要自动展示基准对比字段（若工件存在）
+- [x] 回归覆盖：补齐基准指标计算链路测试（metrics/backtest/reporting）
+- [x] 排行榜评分增强：`compare` 新增 `score_excess_return`，综合评分纳入“跑赢买入持有基准”口径
+- [x] 排行榜回归覆盖：`test_compare.py` 补充 `score_excess_return/excess_total_return` 字段契约
+- [x] 组合回测新增等权持有基准对比：`portfolio_metrics` 默认输出 `benchmark_total_return/excess_total_return/information_ratio`
+- [x] 报告索引增强：组合回测摘要支持展示基准对比字段（若工件存在）
+- [x] 组合基准回归覆盖：`test_portfolio.py` 与 `test_reporting.py` 增补字段契约测试
+- [x] `compare` 新增分组排行榜工件：`leaderboard_by_symbol_*.csv`（按 symbol 分组排序 + `symbol_rank`）
+- [x] 新增分组排行榜回归：`test_build_symbol_leaderboard_adds_group_rank` 与 CLI 子进程工件断言
+- [x] `report` 多策略排行榜增强：新增每文件 `excess_top/excess_bottom` 与跨文件 `aggregate_excess_top/bottom`
+- [x] 新增报告回归：`test_build_report_index_collects_leaderboard_excess_top_bottom`
+- [x] `report` 新增“分组排行榜（按标的）”段落：从 `leaderboard_by_symbol_*.csv` 自动汇总组内冠军策略
+- [x] 新增报告回归：`test_build_report_index_collects_symbol_group_champions`
+- [x] `run-config` 批处理摘要新增分组冠军快照：`compare` 任务写入 `symbol_group_champions`（任务级冠军明细 + `results` 文本字段）
+- [x] `report` 批处理摘要接入分组冠军信息：自动输出 `compare_task#N champions=...`
+- [x] 新增回归：`test_run_config_summary_includes_symbol_group_champions_for_compare_task` 与 `test_build_report_index_collects_run_config_symbol_group_champions`
+- [x] `report` 新增“分组冠军稳定性”：基于最近 10 份 `leaderboard_by_symbol_*` 统计每个 symbol 的冠军切换次数
+- [x] 新增回归：`test_build_report_index_collects_symbol_group_champion_stability`
+- [x] `report` 批处理摘要新增冠军漂移趋势：`champion_switch_last_N_runs`（按 run 汇总 symbol 冠军切换次数）
+- [x] 新增回归：`test_build_report_index_collects_run_config_champion_switch_trend`
+- [x] 分组冠军稳定性新增告警分级：`alert=none/watch/high`（可配置阈值）
+- [x] `report` 批处理冠军漂移趋势新增告警分级：`champion_switch_last_N_runs ... [alert=...]`
+- [x] `report` 新增冠军切换趋势 CSV 导出：默认 `outputs/champion_switch_last_runs.csv`
+- [x] `report` CLI 新增冠军切换参数：`--champion-switch-csv-file/--champion-switch-recent-runs/--champion-switch-watch-threshold/--champion-switch-high-threshold`
+- [x] 新增回归：`test_build_report_index_champion_switch_alert_threshold_override`、`test_export_champion_switch_trend_csv`
+- [x] 主链路最小修复：恢复冠军切换趋势告警摘要与 CSV 导出链路，定向回归通过
+- [x] 冠军趋势 CSV 增加时序字段：`first_run_time/latest_run_time`（便于外部时序告警绘图）
+- [x] 主链路最小修复：分组冠军提取兼容缺失 `composite_score` 的历史/外部 `leaderboard_by_symbol_*.csv`（默认按 0.0 降级）
+- [x] 新增回归：`test_run_config_compare_champions_tolerates_missing_composite_score`、`test_build_report_index_symbol_group_champions_tolerates_missing_composite_score`
+- [x] 主链路复验：`run-config --file examples/config.batch.daily.json` 正常完成
+- [x] 新增 `mvp` 一键验收命令：单次执行覆盖 `QQQ+ETH` 数据拉取、3 策略回测、单标的模拟交易与摘要导出
+- [x] 新增 `examples/config.mvp.json`：支持通过 `run-config` 一键复现实验
+- [x] 新增离线回归：`test_mvp_cli_runs_end_to_end_via_subprocess_without_network`、`test_parse_config_task_mvp_defaults`
+- [x] 新增 `scripts/mvp_report.py`：从 `mvp_summary_*.json` 自动生成分组排行榜（CSV）与简报（Markdown）
+- [x] 新增脚本回归：`test_mvp_report_script_help`、`test_mvp_report_script_builds_outputs_from_summary`
+- [x] 新增 `examples/config.batch.mvp_daily.json`：串联 `mvp -> report` 的日常基线批处理模板
+- [x] 新增模板解析回归：`test_parse_config_tasks_supports_mvp_daily_batch_template`
+- [x] `mvp_summary` 新增跨策略 TopN：`backtest_topn_by_symbol`（按标的 Top3）与 `backtest_topn_overall`（全局 Top5）
+- [x] `mvp` 子进程离线回归扩展：断言 TopN 字段存在且结构有效
+- [x] 主链路最小修复：`StooqDailyProvider` CSV 解析改为标准库 `io.StringIO`，避免 pandas 内部 API 兼容风险
+- [x] baseline-summary 增加 `account_id` + `db_file`（账号隔离）
+- [x] baseline-summary 新增 SQLite 派发健康度聚合：`signal_dispatch_health`（窗口尝试数/失败率/重试命中率）
+- [x] baseline-summary 修复参数透传：CLI 正确注入 `alert-ledger`/派发阈值/账号参数
+- [x] 新增回归：`test_build_baseline_daily_summary_includes_dispatch_health_from_sqlite`
+- [x] 主链路最小修复：`baseline-summary --alert-ledger-file <relative>` 兼容优先解析 `data/state`（若 `outputs/` 同名文件存在则保持兼容），避免误读空台账
+- [x] 新增回归：`test_build_baseline_daily_summary_resolves_relative_ledger_to_state_dir`
+- [x] 新增 Signal Pilot 多账号日常模板：`config.batch.signal_pilot.daily.{default,prod,research}.json`
+- [x] 新增模板解析回归：`test_parse_config_tasks_supports_signal_pilot_daily_account_templates`
+- [x] 新增周频一键入口脚本：`scripts/run_compare_weekly.py`（日期覆盖 + no-run 渲染）
+- [x] 新增脚本回归：`tests/test_run_compare_weekly_script.py`
+- [x] Web 新增只读基线摘要接口：`GET /api/baseline-summary/latest`（按登录账号隔离）
+- [x] 新增 Web 回归：`test_web_baseline_summary_api_is_account_scoped`
+
+## 下一步
+- [x] 将 `1wk` 纳入 `run-config` 模板示例（QQQ/ETH 周频回测与对比）
+- [x] 增加周频对比模板的离线子进程冒烟（无 `PYTHONPATH`）
+- [ ] Web Dashboard 增加 baseline 摘要卡片（页面可视化当前账号最新告警数/派发健康度）
+- [x] 新增 Signal Pilot（信号通知 + 触发点台账 + 观察期收益跟踪 + 观察报告）
+- [x] Signal Pilot 台账持久化：`data/state/signal_alert_ledger.csv`
+- [x] Signal Pilot 新信号扫描：`scan-alerts`（新信号检测 + 同向去重）
+- [x] Signal Pilot 观察收益刷新：`update-alerts`（当前收益/MFE/MAE/持有时长 + reverse/expired 关闭）
+- [x] Signal Pilot 7/30/60 天报告：`report-alerts`（输出 `.csv/.json/.md`）
+- [x] Signal Pilot 回归：`test_signal_pilot_ledger.py`、`test_signal_pilot_scan.py`、`test_signal_pilot_update.py`、`test_signal_pilot_report.py`
+- [x] Signal Pilot 批处理模板补齐并修正路径语义（`config.signal_pilot.*.json` + `config.batch.signal_pilot.daily.json`）
+- [x] 全量回归基线刷新：`pytest -q` => `238 passed, 1 skipped`
+- [x] Signal Pilot 配置模板：`config.signal_pilot.scan/update/report.json` + `config.batch.signal_pilot.daily.json`
+- [x] 模板解析回归：`test_parse_config_task_supports_signal_pilot_scan_template`、`test_parse_config_tasks_supports_signal_pilot_daily_batch_template`
+- [x] 新增 Signal Pilot 通知派发适配器：`dispatch-alerts`（本地 sink / Webhook 可选，成功后回写 ledger `notification_sent`）
+- [x] Signal Pilot 批处理升级：`scan -> dispatch -> update -> report`
+- [x] 新增通知配置模板：`config.signal_pilot.dispatch.json`
+- [x] 新增每日基线总模板：`config.batch.baseline.daily.json`（`mvp + signal_pilot(scan/dispatch/update/report) + report`）
+- [x] 模板解析回归：`test_parse_config_tasks_supports_baseline_daily_batch_template`
+- [x] 新增 `baseline-summary` 命令：聚合 `mvp_summary + signal_pilot_report + report_index` 输出去重摘要（JSON/CSV）
+- [x] 基线模板接入去重摘要：`config.batch.baseline.daily.json` 串联 `... + baseline-summary`
+- [x] 新增回归：`test_build_baseline_daily_summary_collects_mvp_signal_and_report`、`test_baseline_summary_cli_runs_via_subprocess_without_network`、`test_parse_config_task_baseline_summary_defaults`
+- [x] 新增回归：`test_dispatch_alerts_local_sink_updates_ledger_and_writes_sink`、`test_dispatch_alerts_cli_runs_via_subprocess_without_network`
+- [x] baseline/signal 模板参数化：`start/end/as_of` 占位符改为 vars 注入，降低硬编码日期维护成本
+- [x] 新增自动化脚本：`scripts/run_baseline_daily.py`（渲染基线模板日期并可直接执行 run-config）
+- [x] 脚本回归：`test_run_baseline_daily_script_help`、`test_run_baseline_daily_script_renders_config_with_overrides`
+- [x] baseline-summary 阈值化告警：新增 `alert_rules + alerts`（Signal 窗口/胜率/平均收益 + 模拟累计收益）
+- [x] baseline-summary 告警队列导出：`--emit-alert-queue` 输出 `baseline_summary_alerts.jsonl`，可接入派发链路
+- [x] 告警配置化：`baseline-summary` 新增 `signal_alert_window_days/signal_min_count/signal_min_win_rate/signal_min_avg_return_pct/simulation_min_return_pct`
+- [x] 回归补齐：`test_build_baseline_daily_summary_generates_threshold_alerts`、`test_parse_config_task_rejects_invalid_signal_min_win_rate`
+- [x] baseline 告警模板：新增 `examples/config.baseline.summary.alerts.json/.yaml`
+- [x] 模板解析回归：`test_parse_config_task_supports_baseline_alerts_template`、`test_parse_config_task_supports_baseline_alerts_yaml_template`
+- [x] baseline 告警日常批处理模板：新增 `examples/config.batch.baseline.alerts.daily.json/.yaml`（`baseline-summary -> dispatch-alerts`）
+- [x] 批处理模板解析回归：`test_parse_config_tasks_supports_baseline_alerts_daily_batch_template`、`test_parse_config_tasks_supports_baseline_alerts_daily_yaml_batch_template`
+1. 评估将 `config.batch.baseline.daily.json` 接入定时任务（每日固定时间巡检）。
+2. 评估 `baseline-summary` 告警队列与 `dispatch-alerts` 的统一路由策略（是否引入独立 sink/频道字段）。
+3. 评估 baseline 告警分级扩展（`watch/high/critical`）与抑制策略（同 metric 限频）。
+
+## 阻塞
+- `Binance` 公共接口在当前环境可能返回 `451`；当前实现已采用“Binance 主源 + Yahoo 回退”，可自动降级保持可运行。
+
+## 最近决策
+- 数据接入最小兼容修复：`StooqDailyProvider` 的 CSV 解析改用 `io.StringIO`，避免依赖 `pandas.io.common` 内部实现导致版本兼容问题。
+- Signal Pilot 模板落地为“单任务直跑 + batch 串联”双形态，优先保证新手可直接运行且便于自动化调度接入。
+- 每日基线模板采用“禁止 batch 嵌套”的平铺任务链路（mvp + scan/update/report + report），优先保证 run-config 主链路稳定。
+- 新增 `baseline-summary` 去重层：将 `mvp/signal/report` 关键指标统一折叠到单一 JSON/CSV，降低每日巡检重复阅读成本。
+- Signal Pilot 通知派发先采用“本地 JSONL sink + 可选 webhook + ledger 回写 sent 状态”三层口径，优先保证可追踪与可恢复。
+- `mvp` 摘要内建 TopN 字段：优先把“跨策略结果对比”沉淀为结构化 JSON，减少二次脚本解析成本。
+- 增加 `mvp` 一键验收入口：优先提供“可直接跑通并落盘”的最小链路，降低新会话/新机器接入成本。
+- `run_score_vs_macd.py` 增加 `--report-tag`：运行时给 `report.output_file` 追加标签，默认自动注入 UTC 时间戳，避免报告互相覆盖。
+- `run_score_vs_macd.py` 增加 `--emit-config`：支持把渲染后的 batch 配置固定落盘，提升审计与复盘可追溯性。
+- `run_score_vs_macd.py` 增加 `--report-dir`：仅覆盖报告目录、保留文件名，满足“同模板多环境目录分流”且不污染模板默认值。
+- `run_score_vs_macd.py` 增加参数冲突校验：优先在 CLI 层阻断无效参数组合，避免进入批处理后才失败。
+- `run_score_vs_macd.py` 增加 `{ts}` 占位符 + `--keep-emitted-configs`：支持按时间戳落盘配置并自动清理历史，控制巡检工件增长。
+- `run_score_vs_macd.py` 增加 `--report-prefix`：将“批次语义”从手工 `--report-file` 中抽离，命名规则更稳定，可与 tag/dir 组合复用。
+- `run_score_vs_macd.py` 增加 `--emit-config-dir`：将“目录选择”与“文件命名”解耦，默认用时间戳文件名保持审计留痕，同时兼容历史清理窗口。
+- `run_score_vs_macd.py` 增加 `--emit-prefix`：在目录级落盘场景下对自动文件名加前缀，优先保证同目录多专题运行时命名可区分且可检索。
+- `run_score_vs_macd.py` 增加 `--emit-tag`：在目录级落盘场景下对自动文件名加后缀，优先保证同专题多批次运行的标识一致性与检索效率。
+- `run_score_vs_macd.py` 命名增强与历史清理联动：`emit-prefix + emit-tag` 生成路径可被 `keep-emitted-configs` 正确识别并清理旧工件。
+- `run_score_vs_macd.py` 增加命名参数字符集约束：阻断路径分隔符进入 `emit-prefix/emit-tag`，避免目录穿透与清理匹配异常。
+- 新增 `score_vs_macd` 命名演示模板：通过 `batch_prefix + symbol + strategy + batch_tag` 统一 `output_tag/report` 命名，降低多人协作时命名歧义。
+- `run_score_vs_macd.py` 增加 `--emit-separator`：目录级渲染配置命名从固定下划线升级为可配置分隔符，同时保持默认行为兼容。
+- 命名演示模板扩展 ETH 版本：保持与 `score_vs_macd_compare.eth` 同参数口径，降低跨资产命名迁移成本。
+- `run_score_vs_macd.py` 增加 `--emit-template`：在目录级渲染时允许自定义文件名模板，统一“可配置命名”与“强约束占位符”。
+- `run_score_vs_macd.py` 的 `emit` 命名逻辑收敛到 `utils/emit_naming.py`：保持行为不变前提下减少脚本内重复校验与拼接代码，便于后续复用。
+- `run_score_vs_macd.py` 增加 `--naming-demo`：一键切换到命名演示模板，未显式指定执行模式时默认 `--no-run`，优先保证巡检安全性。
+- `run_score_vs_macd.py` 增加 `--run`：仅用于显式执行 `--naming-demo`，并与 `--no-run/--dry-run` 互斥，防止脚本执行意图冲突。
+- 回测指标默认内建买入持有基准对比（同标的、同成本口径），优先让策略评估包含“是否跑赢不交易策略”的最小判断。
+- `compare` 综合评分新增 `score_excess_return` 维度，避免排行榜仅按绝对收益/Sharpe 偏向“高 beta 但未跑赢基准”的策略。
+- 组合回测基准默认采用“同窗口等权持有 + 同成本口径”，优先保证单策略与组合研究的超额收益口径一致。
+- `compare` 默认同步输出 `leaderboard_by_symbol_*.csv`，将“跨资产混排”与“组内比较”拆分为两份工件，优先降低解读歧义。
+- `report` 在排行榜摘要中默认输出超额收益 Top/Bottom（文件级 + 聚合级），优先提升“跑赢基准”维度的复盘速度。
+- `report` 新增“分组排行榜（按标的）”摘要，默认直接展示每个 symbol 组内冠军，减少人工筛查 `leaderboard_by_symbol` 的步骤。
+- `run-config` 摘要对 `compare` 任务新增 `symbol_group_champions`，并同步在 `report` 的“批处理执行摘要”中输出，优先降低跨批次巡检时的二次筛表成本。
+- `report` 新增“分组冠军稳定性”段，默认统计最近 10 份分组榜单的 `switches/unique_champions/latest`，优先支持长期策略漂移巡检。
+- `report` 批处理聚合新增 `champion_switch_last_N_runs`，优先在 run 维度暴露“冠军是否频繁换手”的趋势信号。
+- 分组冠军提取默认容错 `composite_score` 缺失场景（降级 0.0），优先保障旧工件/外部工件接入时主链路稳定。
+- Signal Pilot MVP 采用“本地 CSV 台账 + JSONL 待通知队列 + CLI 三段式（scan/update/report）”路线，优先保证可追踪性与可复现。
+- QQQ 数据源增加 Stooq 回退：优先在主源异常时保持 ETF 数据链路可运行，避免仅依赖 Yahoo 单点。
+- `simulate` 默认落盘 `sim_summary`：优先把核心账户状态沉淀为结构化 JSON，便于批处理巡检与自动消费。
+- Signal Pilot 模板路径改为“相对默认目录的文件名”而非 `data/state/...` 前缀，避免路径被二次拼接后落到错误目录。
+- MVP 阶段优先保证可运行与可复现，先不引入 Web UI。
+- ETH 数据接入采用双源策略：优先 Binance（更贴近交易对），失败时自动回退 Yahoo，优先稳定可用。
+- ETH 数据源优先稳定性：在 API 地域限制条件下采用 Yahoo 免费源，保留后续可扩展空间。
+- 回测模块统一为 `BacktestEngine + BacktestResult`，避免并行两套接口。
+- 策略层统一为 `generate_signals` 协议，注册表提供 `ma_cross/donchian/momentum/regime`。
+- 模拟交易持久化新增成本追踪字段（手续费/滑点/收益率），重启恢复信息更完整。
+- 新增 `research` CLI：支持参数网格搜索和 walk-forward 稳健性评估，并导出 CSV/JSON 报告。
+- 新增 `compare` CLI：支持 `QQQ/ETH` 等多标的多策略批量回测并输出排行榜 CSV。
+- 新增 `run-config` CLI：支持从 JSON 配置驱动 `fetch/backtest/simulate/research/compare`。
+- 新增回测级最大回撤保护：超过阈值后强制空仓并进入冷却周期，默认关闭以保持兼容。
+- 新增策略解释输出：`backtest` 导出 `signals_*.csv`，`simulate` 导出 `sim_signals_*.csv`。
+- 新增 `portfolio` CLI：支持 `QQQ,ETH` 等多标的等权组合回测并导出组合净值/指标/仓位。
+- 新增 `report` CLI：自动汇总 `outputs` 目录中的回测/研究/组合结果为中文 Markdown。
+- 组合回测新增 `allocation_mode`：支持 `equal/risk_parity/vol_target`，并提供 `target_vol/max_leverage` 参数。
+- 新增 `simulate-portfolio` CLI：按共同时间轴驱动 `QQQ/ETH` 等多标的信号，在同一资金账户内执行并持久化状态。
+- 组合回测新增归因导出：`portfolio_contrib_*.csv` 与 `portfolio_attribution_*.csv`。
+- 新增 `stability` CLI：从 `walk_forward_*.csv` 导出参数稳定性摘要与参数频次统计。
+- 新增组合模拟风控参数：`max-symbol-allocation`、`max-total-allocation`、`max-portfolio-drawdown`、`risk-cooldown-bars`。
+- 组合回测新增协方差模式：`cov_risk_parity` 与 `cov_vol_target`（基于滚动协方差逆矩阵近似风险预算）。
+- 组合回测新增告警导出：`portfolio_alerts_*.csv`，记录相关性与同向拥挤风险。
+- 新增 `test_simulate_portfolio_risk.py`：覆盖“回撤触发平仓 + 冷却期阻断开仓”关键路径。
+- 组合回测新增权重明细导出：`portfolio_weights_*.csv`，并在 `report` 中汇总平均总暴露。
+- 组合告警阈值支持参数化：`--corr-watch/high-threshold`、`--crowding-watch/high-threshold`，并支持 `run-config` 注入。
+- 组合模拟新增资金约束回归覆盖：总仓位上限耗尽时阻断新开仓、连续反转时交易链路连续可执行。
+- 组合回测新增权重偏移导出：`portfolio_drift_*.csv`，并在 `report` 汇总平均/最大绝对偏移。
+- 组合权重偏移新增阈值告警：`--drift-watch/high-threshold`，导出 `drift_alert_level` 并在报告中汇总 high/watch 次数。
+- `simulate-portfolio` 新增保证金与现金保留约束：`--initial-margin-rate`、`--cash-reserve-ratio`，并补回归用例覆盖“保证金耗尽阻断新开仓”。
+- 报告索引新增漂移高告警连续段统计：`max_high_streak` 与 `high_segments`，用于识别持续偏移风险。
+- 示例配置新增 `strict/loose` 两档组合告警模板与保证金模拟模板，便于批处理场景快速复现。
+- `simulate-portfolio` 新增 `sim_portfolio_capital_*.csv`，输出每根 bar 的权益、总暴露、已用/可用保证金与预留现金。
+- `run-config` 支持批处理：新增 `command: "batch"` + `tasks`，任务支持内联对象或 `file` 路径引用并按顺序执行。
+- `report` 新增“组合资金占用摘要”段：自动统计 `sim_portfolio_capital_*.csv` 的平均暴露率、平均/峰值保证金利用率与平均预留现金占比。
+- `portfolio` 新增漂移联动再平衡实验参数：`--rebalance-on-drift`、`--rebalance-trigger`、`--rebalance-scale`，并导出 `portfolio_rebalance_*.csv`。
+- 新增端到端批处理示例：`examples/config.batch.portfolio_pipeline.json`（抓取+组合回测+组合模拟+报告）。
+- `run-config` 批处理新增 `on_error`：支持 `fail_fast`（默认）与 `continue`（收集失败后汇总抛出）。
+- `report` 的漂移再平衡实验段新增跨文件排名：按单次触发平均成本输出 best/worst 文件。
+- 修复 `run-config` 错误处理链路：`continue` 模式下失败任务继续执行，但批处理结束后统一抛出失败汇总异常，避免 CI 误判成功。
+- `run-config` 批处理摘要增强：未显式配置时默认输出 `outputs/run_config_batch_summary.json/csv`，并记录 `run_id`、时间戳与耗时。
+- `run-config` 新增 `vars` 占位符（`${name}`）与 `tasks[].vars` 局部覆盖，支持模板化复用参数。
+- 新增模板 `examples/config.batch.portfolio_template.json`：统一占位符串联 `fetch + portfolio + simulate-portfolio + report`。
+- `run-config` 摘要 JSON 新增整次运行字段：`run_started_at`、`run_ended_at`、`run_duration_ms`，用于性能追踪。
+- 新增回归测试：占位符缺失变量时抛出明确错误，防止模板静默误配。
+- 新增模板：`config.batch.portfolio_conservative.json` / `config.batch.portfolio_aggressive.json`，用于中长线参数敏感性实验。
+- 新增回归测试：`tasks[].vars`/`tasks.file.vars` 类型校验与 `summary_json/summary_csv` 类型校验，防止配置误写进入执行阶段。
+- `report` 新增“批处理执行摘要”段：识别 run-config 摘要工件并汇总 run_id、任务计数、总耗时与最慢任务。
+- 新增 `BATCH_PRESETS.md`：给出保守/激进模板的指标口径、运行方式与结果解读标准。
+- `run-config` 新增重试参数：`retry_count`、`retry_delay_ms`；任务结果写入 `attempts` 字段用于复盘重试成本。
+- 修复测试回归：`on_error=continue` 在失败场景下改回 `RuntimeError` 断言，避免与 CLI 语义分叉。
+- `run-config` 重试能力增强：新增 `retry_enabled` / `retry_retryable_only` 开关与任务级 `retry` 覆盖（count/delay/enabled/retryable_only）。
+- `report` 的批处理摘要新增 `failed_top_commands`，用于快速定位最常失败命令。
+- 紧急恢复主链路：再次核对 `on_error=continue` 语义与回归测试一致（继续执行 + 末尾抛汇总异常），全量测试恢复为 `63 passed`。
+- 细化可重试错误判定：默认仅重试网络/超时/限流类错误，文件缺失/权限类错误直接失败，避免无效重试。
+- 新增重试策略回归覆盖：默认可重试过滤、全量重试开关、任务级 `retry` 覆盖；当前全量测试为 `67 passed`。
+- `report` 新增跨文件聚合段：同时输出 `aggregate_all_runs` 与 `aggregate_last_N_runs`，覆盖运行失败率、任务失败率与平均/P50/P90 耗时。
+- 新增报告回归测试：覆盖批处理跨文件聚合口径，防止后续统计口径漂移。
+- 当前全量测试更新为 `68 passed`。
+- `run-config` 新增 `max_total_retries`（跨任务共享）与 `retry_budget_remaining`，预算耗尽后停止继续重试。
+- 任务明细新增 `retries_used` 字段，便于复盘重试成本；新增回归覆盖预算耗尽场景。
+- 新增 `scripts/compare_batch_presets.py`：一键执行保守/激进批处理并导出 `outputs/preset_compare/preset_compare.csv/.md`。
+- 全量测试复验通过：`75 passed`。
+- 主链路修复：`compare_presets` 检测 `run-config` 子进程返回码，失败时抛出 `RuntimeError`，避免假成功。
+- 新增回归测试：覆盖“批处理进程失败必须中断”场景；全量测试更新为 `77 passed`。
+- `run-config` 新增总重试预算参数：`max_total_retries`，跨任务共享重试额度，预算耗尽即停止重试。
+- 修复重试循环边界：按任务级 `task_retry_count` 控制 while 条件，避免被全局重试次数错误放大。
+- 回归测试新增预算与任务级重试覆盖场景；当前全量测试更新为 `73 passed`。
+- 最小修复：去重 `DECISIONS.md` 中重复 `D-049` 条目，恢复决策编号唯一性；主链路验证（`pytest -q` + `run-config config.batch.daily`）通过。
+- 最小修复：`preset_compare` 在缺少 `tabulate` 依赖时降级为手写 Markdown 表格，恢复预设对比主链路；全量测试更新为 `74 passed`。
+- 补齐 README 对应入口：新增 `scripts/compare_batch_presets.py`，支持 `--no-run`（只读现有工件）模式。
+- 新增脚本可用性回归：`tests/test_compare_batch_presets_script.py`（`--help` 冒烟）。
+- 当前全量测试更新为 `75 passed`。
+- `report` 批处理聚合新增重试效率统计：`retry_hit_rate`、`total_retries_used`、`non_retryable_fail_share`。
+- 新增回归测试 `test_build_report_index_collects_retry_efficiency_aggregate`，覆盖重试效率口径。
+- 当前全量测试更新为 `76 passed`。
+- `run-config` 新增 `retry_budget_trace_csv`，可导出任务级预算轨迹（`budget_before/budget_after/retries_used`）。
+- 新增回归测试：覆盖轨迹路径解析、非法类型校验、CSV 落盘与预算消耗顺序。
+- `preset_compare` 新增 `vars_override`，支持在运行时注入变量（当前用于覆盖 `start/end`），并以临时配置文件驱动 `run-config` 执行。
+- `scripts/compare_batch_presets.py` 新增 `--start/--end` 参数；两者需成对提供，避免区间参数误配。
+- 新增回归测试：覆盖脚本参数约束与运行时变量覆盖；当前全量测试更新为 `82 passed`。
+- 最小修复：`preset_compare` 用 `np.nan` 替代 `pd.NA` 参与除法/填充链路，消除 pandas `FutureWarning`，恢复严格告警主链路稳定性。
+- 修复后验证：`tests/test_preset_compare.py` 与全量测试均通过（`82 passed`）。
+- `report` 现可识别 `outputs/preset_compare/preset_compare.csv` 并新增“预设对比摘要”，自动输出激进-保守关键差值。
+- 新增回归测试 `test_build_report_index_collects_preset_compare_summary`；当前全量测试更新为 `83 passed`。
+- 补齐重试预算轨迹报告回归：新增 `test_build_report_index_collects_retry_budget_trace_summary`，锁定耗尽事件与 aggregate 口径。
+- 最小修复：`report` 预设差值计算改为字段级数值安全转换，避免非数值列触发减法异常导致主链路中断。
+- 修复后验证：新增/既有 `reporting` 用例通过，全量测试更新为 `88 passed`。
+- 最小修复：`tests/test_preset_compare.py` 补充 `Path` 导入，恢复全量回归稳定性（`82 passed`）。
+- `preset_compare` 每次对比新增快照工件：`outputs/preset_compare/preset_compare_<timestamp>.csv`。
+- `report` 的预设对比摘要新增历史视图：输出 latest/prev `total_return_gap` 与 `delta`；新增回归 `test_build_report_index_collects_preset_compare_history`，当前全量测试 `88 passed`。
+- 最小修复：清理 `DECISIONS.md` 重复编号，恢复 `D-054+` 段落唯一编号，避免后续引用歧义。
+- 预算轨迹摘要新增失败分布：`failed_rows`、`failed_ratio`、`depleted_failed`，并扩展 aggregate 行同口径字段。
+- 新增脚本工件结构回归：`test_compare_batch_presets_script_writes_expected_artifacts`，锁定 CSV/MD 输出与关键字段。
+- 最小修复：`tests/test_reporting.py` 重复函数名去重，防止测试被覆盖未执行。
+- 预算轨迹摘要新增耗尽命令分布（文件级 + aggregate）；全量测试更新为 `90 passed`。
+- 新增 `macd_regime` 策略：MACD 趋势确认叠加 regime/波动率过滤，已接入注册表与 CLI 策略枚举。
+- 新增回归测试：`test_macd_regime_signal_shape`，覆盖新策略信号与 explain 输出契约。
+- 新增模拟交易恢复回归：`test_cmd_simulate_can_resume_from_persisted_state`，验证状态持久化的 CLI 链路可复现。
+- 本轮全量测试：`126 passed, 1 skipped`。
+- 新增模板：`examples/config.research.macd_regime.json`（QQQ + macd_regime + 默认网格）。
+- 更新 `examples/config.compare.json`：默认策略列表加入 `macd_regime`，对比入口与策略注册保持一致。
+- README `run-config` 示例新增 `config.research.macd_regime.json` 调用命令。
+- 新增模板：`examples/config.backtest.macd_regime.json`（QQQ + macd_regime 单策略回测复现入口）。
+- README `run-config` 示例补齐 `config.backtest.macd_regime.json` 调用命令。
+- 本轮验证：`pytest -q tests/test_config_runner.py` => `48 passed`。
+- 新增中长线策略：`score_regime`（动量 + 趋势 + 均值回归加权评分，叠加波动率过滤），并接入 `get_strategy`、CLI 策略 choices、`compare` 默认策略列表。
+- 新增回归测试：`test_score_regime_signal_shape`，验证新策略信号空间与 explain 契约一致。
+- 本轮验证：`pytest -q tests/test_strategies.py tests/test_compare.py tests/test_config_runner.py` => `58 passed`。
+- 新增研究模板：`examples/config.research.score_regime.json`，提供 `score_regime` 的默认参数网格入口（`momentum/trend/mean_revert/threshold/weights`）。
+- 新增配置回归：`test_parse_config_task_supports_score_regime_research_template`，锁定模板与 `run-config` 解析契约。
+- 新增 CLI 子进程离线回归：`test_compare_cli_default_strategies_runs_via_subprocess_without_network`，覆盖默认策略集（含 `score_regime`）在无 `PYTHONPATH` 场景下可执行。
+- 本轮验证：`pytest -q tests/test_cli_entry.py -k compare_cli_default_strategies_runs_via_subprocess_without_network` => `1 passed`。
+- 新增单策略回测模板：`examples/config.backtest.score_regime.json`，提供 `score_regime` 固定参数复现入口。
+- 新增配置解析回归：`test_parse_config_task_supports_score_regime_backtest_template`，锁定 `run-config` 对回测模板的解析契约。
+- 本轮验证：`pytest -q tests/test_config_runner.py -k score_regime` => `2 passed`。
+- 新增串联模板：`examples/config.batch.score_regime_stability.json`，一条批处理串行执行 `research -> stability -> report`。
+- 新增配置解析回归：`test_parse_config_tasks_supports_score_regime_stability_batch_template`，锁定模板任务顺序与占位符渲染结果。
+- 本轮验证：`pytest -q tests/test_config_runner.py -k score_regime_stability_batch_template` => `1 passed`。
+- 新增 CLI 子进程恢复冒烟：`test_simulate_cli_can_resume_state_via_subprocess_without_network`（预置本地缓存，连续两次 `simulate` 复用同一 `state_file`）。
+- 冒烟验证通过：`pytest -q tests/test_cli_entry.py` => `2 passed`。
+- 新增 `backtest --output-tag`：支持输出 `metrics/equity/trades/signals` 带标签后缀，避免同策略多参数批处理互相覆盖。
+- 新增模板：`examples/config.batch.macd_sensitivity.json`（三组 `macd_regime` 参数 + 自动 `report` 汇总）。
+- 新增回归测试：`test_parse_config_task_backtest_accepts_output_tag` 与 `test_backtest_cli_output_tag_avoids_overwrite_via_subprocess`。
+- 本轮验证：`pytest -q tests/test_config_runner.py tests/test_cli_entry.py` => `52 passed`。
+- 新增模板：`examples/config.batch.simulate_resume.json`（两段 `simulate` 任务复用同一 `state_file`，末尾自动 `report`）。
+- 新增回归测试：`test_parse_config_tasks_supports_simulate_resume_pipeline`。
+- 本轮验证：`pytest -q tests/test_config_runner.py` => `50 passed`。
+- 新增模板：`examples/config.batch.output_tag_compare.json`（同一策略三组参数 + `output_tag` 命名规范 + 自动 report）。
+- README 同步补充 `output_tag` 命名建议（`symbol+strategy+关键参数`）与模板入口命令。
+- 新增脚本：`scripts/smoke_simulate_resume.py`，离线构造缓存并执行两段 `simulate`，校验 `second_trade_count > first_trade_count`。
+- 新增脚本回归：`tests/test_smoke_simulate_resume_script.py`（`--help` 冒烟 + 默认执行成功路径）。
+- README 新增 `simulate` 恢复离线冒烟命令示例：`python3 scripts/smoke_simulate_resume.py`。
+- 新增模板回归：`test_parse_config_tasks_supports_output_tag_compare_template`，锁定 `examples/config.batch.output_tag_compare.json` 的任务结构与 `output_tag` 字段约束。
+- `smoke_simulate_resume.py` 新增日期约束校验：要求 `start < split-end < end`，非法输入即时 CLI 报错。
+- 脚本回归补齐：新增“自定义 split/params 成功路径”与“非法时间顺序失败路径”测试。
+- 本轮全量回归：`pytest -q` => `135 passed, 1 skipped`。
+- 新增数据质量诊断能力：`diagnose-data` CLI + `diagnose_ohlcv_quality` 模块，可导出 `data_quality_*.json` 与异常行 `data_quality_anomalies_*.csv`。
+- 新增配置模板：`examples/config.diagnose.qqq.json`，可通过 `run-config` 直接执行数据体检。
+- 新增回归测试：`tests/test_data_quality.py`（缺失/异常价格/OHLC 边界/跳点口径）与 `test_parse_config_task_diagnose_data_defaults`。
+- 新增 CLI 子进程离线回归：`test_diagnose_data_cli_runs_via_subprocess_without_network`，锁定命令入口可用性。
+- README 已补充数据质量诊断命令与输出说明。
+- `simulate` 新增动态仓位参数：`--allocation-per-signal`（按权益比例开仓）与 `--min-quantity`（最小开仓数量阈值）。
+- `simulate` 信号日志新增 `quantity` 字段；当触发最小数量阻断时，`reason` 追加 `qty_below_min`。
+- 新增模板：`examples/config.simulate.allocation.json`，提供单标的按权益比例仓位的可复现实验入口。
+- 新增回归测试：
+  - `test_parse_config_task_simulate_defaults`（锁定新默认参数解析）
+  - `test_cmd_simulate_supports_allocation_per_signal_dynamic_quantity`（锁定动态数量计算链路）
+- 全量测试更新：`146 passed, 1 skipped`。
+- `simulate` 新增逐 bar 资金曲线导出：`sim_equity_<symbol>_<strategy>.csv`（cash/realized/floating/cumulative/total_equity/return_pct）。
+- `test_cmd_simulate_supports_allocation_per_signal_dynamic_quantity` 已扩展校验资金曲线文件存在与字段契约。
+- `report` 新增“单标的模拟资金曲线摘要”：自动识别 `sim_equity_*.csv`，汇总 bars、起止权益、总收益、最大回撤。
+- 新增回归测试：`test_build_report_index_collects_sim_equity_summary`，锁定摘要字段与收益口径。
+- 新增中长线策略 `atr_regime`：ATR 归一化趋势强度 + 波动率分位过滤，支持多空/空仓并接入 `get_strategy`。
+- CLI 与默认策略集同步扩展：`backtest/simulate/simulate-portfolio/research/portfolio` 的 `--strategy` choices、`compare` 默认策略串、`_config_defaults(compare)` 均纳入 `atr_regime`。
+- 新增模板：
+  - `examples/config.backtest.atr_regime.json`
+  - `examples/config.research.atr_regime.json`
+- `examples/config.compare.json` 默认策略列表加入 `atr_regime`，保证对比入口与 CLI 一致。
+- 新增回归测试：
+  - `test_atr_regime_signal_shape`
+  - `test_parse_config_task_supports_atr_regime_research_template`
+  - `test_parse_config_task_supports_atr_regime_backtest_template`
+  - `test_compare_cli_default_strategies_runs_via_subprocess_without_network` 增补 `atr_regime` 断言
+- 文档同步：`README.md` 与 `STRATEGIES.md` 已补充 `atr_regime` 说明与运行入口。
+- 本轮验证：
+  - `pytest -q tests/test_strategies.py tests/test_config_runner.py tests/test_cli_entry.py -k "atr_regime or compare_cli_default_strategies_runs_via_subprocess_without_network or score_regime"` => `8 passed`
+  - `pytest -q` => `197 passed, 1 skipped`
+- 数据接入层增强：新增 `CoinGeckoProvider`（`market_chart/range`），可将价格序列重采样为 `OHLCV`，支持 `1d/1h/4h`。
+- ETH 数据路由升级为三级回退：`Binance ETHUSDT -> Yahoo ETH-USD -> CoinGecko ethereum`。
+- 新增数据层回归：`test_coingecko_provider_builds_ohlcv_from_market_chart`，覆盖 CoinGecko payload 到 `OHLCV` 的转换契约。
+- 定向验证：`pytest -q tests/test_data_manager.py tests/test_data_provider_integration.py -k "coingecko or binance or fallback or incremental"` => `4 passed, 1 skipped`。
+- 全量回归更新：`pytest -q` => `198 passed, 1 skipped`。
+- 新增 `atr_regime` 批处理稳定性模板：`examples/config.batch.atr_regime_stability.json`，一条配置串行执行 `research -> stability -> report`。
+- 新增解析回归：`test_parse_config_tasks_supports_atr_regime_stability_batch_template`，锁定模板任务顺序与 `walk_forward` 工件路径契约。
+- README `run-config` 示例清单已加入 `config.batch.atr_regime_stability.json` 入口命令。
+- 本轮验证：
+  - `pytest -q tests/test_config_runner.py -k "atr_regime_stability or atr_regime_backtest or atr_regime_research"` => `3 passed`
+  - `pytest -q` => `199 passed, 1 skipped`
+- `run-config` 新增 YAML 配置支持：`.yaml/.yml` 通过 `PyYAML` 解析，保留 `.json` 兼容。
+- 新增 YAML 回归：
+  - `test_parse_config_task_supports_yaml_file`
+  - `test_parse_config_task_rejects_non_object_yaml`
+  - `test_parse_config_tasks_supports_yaml_batch_file`
+  - `test_parse_config_task_supports_mvp_yaml_template`
+- 新增模板：`examples/config.mvp.yaml`，与 JSON 版参数等价。
+- 文档同步：README 明确 `run-config` 支持 JSON/YAML，并补充 YAML MVP 启动命令。
+- 新增批处理 YAML 模板：`examples/config.batch.mvp_daily.yaml`（`mvp -> report`）。
+- 新增解析回归：`test_parse_config_tasks_supports_mvp_daily_yaml_batch_template`。
+- 本轮验证：
+  - `pytest -q tests/test_config_runner.py` => `75 passed`
+  - `pytest -q tests/test_config_runner.py tests/test_cli_entry.py` => `82 passed`
+  - `pytest -q` => `250 passed, 1 skipped`
+
+## 本轮摘要（2026-03-16 run-config schema 最小版）
+- 当前进展：
+  - `run-config` 对已支持命令增加最小 schema 校验（未知字段/缺失必填/类型不匹配/非法 choices 前置拦截）。
+  - `run-config` 新增常见数值边界校验（如 `fee_rate>=0`、`allocation_per_signal∈(0,1]`、`champion_switch_recent_runs>0`）。
+  - 保持批处理原有“未知命令进入任务失败统计与重试链路”语义，避免破坏 `on_error=continue` 与重试预算测试。
+  - README 已补充 run-config 前置校验行为说明。
+  - 补齐 YAML 批处理模板：新增 `examples/config.batch.signal_pilot.daily.yaml` 与 `examples/config.batch.baseline.daily.yaml`。
+- 新增回归测试：
+  - `test_parse_config_task_rejects_unknown_field`
+  - `test_parse_config_task_rejects_missing_required_field`
+  - `test_parse_config_task_rejects_invalid_value_type`
+  - `test_parse_config_task_rejects_invalid_choice`
+  - `test_parse_config_tasks_supports_signal_pilot_daily_yaml_batch_template`
+  - `test_parse_config_tasks_supports_baseline_daily_yaml_batch_template`
+  - `test_parse_config_task_rejects_negative_fee_rate`
+  - `test_parse_config_task_rejects_invalid_allocation_per_signal`
+  - `test_parse_config_task_rejects_non_positive_recent_runs`
+- 本轮验证：
+  - `pytest -q tests/test_config_runner.py` => `85 passed`
+  - `pytest -q tests/test_cli_entry.py -k "run_config or mvp or module_entry_works_without_pythonpath"` => `2 passed`
+- 下一步：补齐 `run-config` 的错误信息聚合视图（同一任务多字段错误一次性输出），减少配置排障迭代次数。
+- 阻塞：无。
+- 最近决策：见 `DECISIONS.md` 新增 D-157/D-158/D-159。
+
+## 本轮摘要（2026-03-16 Signal Pilot 文档化）
+- 当前进展：
+  - 新增独立文档 `SIGNAL_PILOT.md`（功能目标、适用场景、`scan->dispatch->update->report` 生命周期、ledger 字段、日常运行、1~2 个月观察方法、限制与扩展方向）。
+  - `README.md` 新增 Signal Pilot 文档导航入口，降低新人检索成本。
+- 下一步：将 Signal Pilot 报告扩展为“按策略排名 + 周度趋势”双视图。
+- 阻塞：无。
+- 最近决策：见 `DECISIONS.md` 新增 D-160。
+
+## 本轮摘要（2026-03-16 dispatch 重试与幂等窗口）
+- 当前进展：
+  - `dispatch-alerts` 增加 webhook 失败重试：`retry_count` + `retry_delay_ms`，仅对可重试错误（超时/限流/5xx/连接抖动）生效。
+  - `dispatch-alerts` 增加幂等窗口：`idempotency_window_minutes`，窗口内同一 `alert_id` 若已尝试派发则跳过。
+  - Ledger 新增通知状态字段：`notification_last_attempt_at`、`notification_last_sent_at`、`notification_fail_count`，支持重启后连续去重与失败追踪。
+  - Webhook 请求头新增 `X-Idempotency-Key: <alert_id>`，便于下游系统实现服务端幂等。
+  - `examples/config.signal_pilot.dispatch.json`、CLI 默认参数与 run-config 解析默认值已同步。
+- 新增回归测试：
+  - `test_dispatch_alerts_webhook_retry_then_success`
+  - `test_dispatch_alerts_idempotency_window_skips_recent_attempt`
+  - `test_parse_config_task_rejects_negative_dispatch_retry_count`
+  - 扩展 `dispatch` 模板/默认值断言。
+- 本轮验证：
+  - `pytest -q tests/test_signal_pilot_notify.py tests/test_config_runner.py -k "dispatch or signal_pilot_commands or invalid_dispatch_retry"` => `7 passed`
+  - `pytest -q tests/test_signal_pilot_ledger.py tests/test_cli_entry.py -k "dispatch_alerts_cli_runs_via_subprocess_without_network or alert_ledger"` => `3 passed`
+- 下一步：
+  1. 在 `dispatch-alerts` 摘要中增加“错误类型分布 TopN”（timeout/429/5xx）便于值班巡检。
+  2. 在 `baseline-summary` 增加“Signal 派发失败率”字段，接入每日摘要阈值告警。
+- 阻塞：无。
+- 最近决策：见 `DECISIONS.md` 新增 D-161。
+
+## 本轮摘要（2026-03-16 主链路最小修复：dispatch 空队列返回契约）
+- 当前进展：
+  - 修复 `dispatch-alerts` 在“队列文件不存在”分支下返回字段不完整问题，统一与正常路径保持同一摘要契约（补齐 `sink_file/channel/retry_count/retried/retry_succeeded`）。
+  - 该修复避免上游 `run-config`/日报聚合脚本按固定字段读取时出现 `KeyError`，属于主链路兼容性修复。
+- 新增回归测试：
+  - `test_dispatch_alerts_missing_queue_returns_stable_summary_schema`
+- 本轮验证：
+  - `pytest -q tests/test_signal_pilot_notify.py -k "missing_queue or retry or idempotency or local_sink or dry_run"` => `5 passed`
+  - `PYTHONPATH=src python3 -m market_signal_system run-config --file examples/config.signal_pilot.dispatch.json` => 成功输出统一摘要字段
+- 下一步：
+  1. 继续推进 `dispatch` 错误类型聚合并接入 `baseline-summary` 告警字段。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 dispatch 错误类型聚合）
+- 当前进展：
+  - `dispatch-alerts` 摘要新增 `error_type_counts`，按失败类型聚合计数（`rate_limit/server_5xx/http_4xx/timeout/connection/temporary/unknown`）。
+  - `errors[]` 明细新增 `error_type`，便于后续 report/baseline 层直接消费。
+  - 保持兼容：空队列分支也返回 `error_type_counts={}`，避免字段缺失。
+- 新增回归测试：
+  - `test_dispatch_alerts_collects_error_type_counts`
+  - `test_dispatch_alerts_missing_queue_returns_stable_summary_schema`（扩展断言）
+- 本轮验证：
+  - `pytest -q tests/test_signal_pilot_notify.py` => `6 passed`
+- 下一步：
+  1. 将 `error_type_counts` 汇总接入 `baseline-summary` 的告警阈值与每日 digest 行。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 主链路最小修复：baseline daily 批处理恢复）
+- 当前进展：
+  - 修复 `run-config -> mvp` 参数归一化回归：`simulate_params` 在配置解析阶段统一 JSON 字符串化，避免 `json.loads(dict)` 报错。
+  - 增加策略参数向后兼容：`MomentumVolatilityStrategy` 支持旧参数别名 `lookback/vol_window/volatility_limit`。
+  - 修复 `update-alerts` 边界：当 `end <= created_at` 时跳过该条 open alert，避免 `DataManager end must be greater than start` 中断批处理。
+  - 同步保持 `score_regime.weights` 旧模板兼容（本轮主链路已验证通过）。
+- 新增回归测试：
+  - `test_parse_config_task_normalizes_mvp_simulate_params_dict`
+  - `test_momentum_accepts_legacy_alias_params`
+  - `test_update_alerts_skips_when_end_not_after_created_at`
+- 本轮验证：
+  - `pytest -q tests/test_strategies.py tests/test_signal_pilot_update.py tests/test_config_runner.py -k "legacy_alias or legacy_weights or simulate_params or end_not_after_created_at"` => `4 passed`
+  - `PYTHONPATH=src python3 -m market_signal_system run-config --file examples/config.batch.baseline.daily.json` => 全 7 任务执行完成
+- 下一步：
+  1. 继续把 `dispatch error_type_counts` 纳入 `baseline-summary` 的告警行与 digest 字段。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 baseline 接入 Signal 派发失败指标）
+- 当前进展：
+  - `baseline-summary` 新增 `signal_dispatch` 段，默认从 `data/state/signal_alert_ledger.csv` 聚合：
+    - `open_alerts`
+    - `pending_notification`
+    - `failed_notification`
+    - `failed_ratio`
+  - 告警规则新增 dispatch 维度：
+    - `dispatch_max_failed_count`（watch）
+    - `dispatch_max_failed_ratio`（high）
+  - CLI 与 run-config 默认参数已暴露：
+    - `alert_ledger_file`
+    - `dispatch_max_failed_count`
+    - `dispatch_max_failed_ratio`
+  - `rows` 导出新增 `signal_dispatch.*`，支持 CSV 下游消费。
+- 新增回归测试：
+  - `test_build_baseline_daily_summary_collects_dispatch_metrics_from_ledger`
+  - `test_parse_config_task_baseline_summary_defaults` 扩展 dispatch 默认值断言
+- 本轮验证：
+  - `pytest -q tests/test_baseline_summary.py tests/test_config_runner.py tests/test_signal_pilot_notify.py -k "baseline_summary or dispatch or missing_queue or defaults"` => `28 passed`
+- 下一步：
+  1. 在 `dispatch-alerts` 输出中增加错误类型 TopN（timeout/429/5xx），并可选写入日报工件。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 MVP 主链路可维护性重构）
+- 当前进展：
+  - 新增 `src/market_signal_system/mvp/pipeline.py`，把 `mvp` 命令的执行编排（数据拉取、回测、模拟、验收）从 `cli.py` 中拆分为独立模块。
+  - 新增 `MvpPipelineConfig` 配置对象与 `run_mvp_pipeline()` 入口，CLI 改为“参数解析 + 调用编排模块”。
+  - MVP 验收逻辑迁移为 `build_mvp_acceptance()`，并新增独立单测。
+- 新增回归测试：
+  - `tests/test_mvp_pipeline.py`
+- 本轮验证：
+  - `pytest -q tests/test_mvp_pipeline.py tests/test_cli_entry.py -k "mvp_cli_runs_end_to_end_via_subprocess_without_network or mvp_cli_strict_acceptance_fails_when_not_covering_short_signal or test_mvp_pipeline"` => `4 passed`
+- 下一步：
+  1. 补一版“从零启动 MVP”的 README 精简路径（`pyproject + requirements` 双模式），减少新环境上手成本。
+  2. 给 MVP 核心链路加最小结构说明文档，明确模块边界与后续增强顺序。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 项目初始化与依赖管理增强）
+- 当前进展：
+  - 新增 `scripts/bootstrap_project.py`：统一创建 `.venv` 并安装依赖，支持 `pyproject` / `requirements` / `hybrid` 三种模式。
+  - README 安装章节新增“推荐初始化脚本”路径，明确 `--dev --mode hybrid` 的一键方式。
+  - 新增脚本帮助回归测试 `tests/test_bootstrap_project_script.py`。
+- 本轮验证：
+  - `pytest -q tests/test_bootstrap_project_script.py` => `1 passed`
+- 下一步：
+  1. 增补一个最小“里程碑实现清单”文档，把 `数据层/回测/策略/模拟交易` 的 MVP 验收点显式写入，便于后续持续开发对照。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 离线 MVP 烟雾链路）
+- 当前进展：
+  - 新增 `scripts/mvp_offline_smoke.py`，使用合成 QQQ/ETH 数据离线执行：3 个中长线策略回测 + momentum 模拟交易。
+  - 输出 `mvp_offline_smoke_*.json`，用于无网络环境下快速验证“策略/回测/模拟交易”核心链路可运行。
+  - README 快速开始新增离线烟雾命令。
+- 新增回归测试：
+  - `tests/test_mvp_offline_smoke_script.py`
+- 本轮验证：
+  - `pytest -q tests/test_mvp_offline_smoke_script.py` => `2 passed`
+- 下一步：
+  1. 将离线 smoke 结果字段与 `mvp_acceptance` 对齐，形成统一最低验收结构（便于 CI 复用）。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 主链路最小修复：offline smoke 状态隔离）
+- 当前进展：
+  - 修复 `scripts/mvp_offline_smoke.py` 模拟交易状态文件复用问题：改为 `--state-prefix + run_tag + symbol` 唯一命名，避免历史状态污染当前运行结果。
+  - CLI 帮助新增 `--state-prefix` 参数。
+- 新增/调整测试：
+  - `tests/test_mvp_offline_smoke_script.py` 增加 `--state-prefix` 帮助与执行参数断言。
+- 本轮验证：
+  - `pytest -q tests/test_mvp_offline_smoke_script.py` => `2 passed`
+- 下一步：
+  1. 继续按 TASK 主链路增强 MVP 验收一致性（离线 smoke 与在线 mvp 摘要字段对齐）。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 离线 smoke 验收口径对齐）
+- 当前进展：
+  - `scripts/mvp_offline_smoke.py` 现已复用 `build_mvp_acceptance`，输出 `mvp_acceptance` 字段，与在线 `mvp` 主链路摘要结构对齐。
+  - 便于 CI/批处理在离线模式下复用同一套最低标准检查（多空空仓覆盖、回测数量、模拟快照字段等）。
+- 新增/调整测试：
+  - `tests/test_mvp_offline_smoke_script.py` 增加 `mvp_acceptance` 结构断言。
+- 本轮验证：
+  - `pytest -q tests/test_mvp_offline_smoke_script.py tests/test_mvp_pipeline.py` => `4 passed`
+- 下一步：
+  1. 继续补充主链路工程化能力（优先在 README 增加“从初始化到首次产出”的最短命令链）。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 数据层增量更新显式化）
+- 当前进展：
+  - 新增 `DataManager.update_cache(symbol,start,end,interval)`，将缓存增量更新结果结构化输出（更新前后行数、缓存区间、窗口行数、是否变更）。
+  - 新增 CLI 命令 `update-cache`，支持 `--symbols QQQ,ETH` 批量更新并输出 JSON 摘要，便于日常批处理与可观测性。
+  - `run-config` 已接入 `update-cache`（默认值：`symbols=QQQ,ETH`、`interval=1d`）。
+  - 新增模板：`examples/config.update_cache.json`。
+  - README 已补充显式增量更新命令与模板入口。
+- 新增回归测试：
+  - `test_update_cache_returns_summary_and_grows_cache`
+  - `test_parse_config_task_update_cache_defaults`
+  - `test_parse_config_task_supports_update_cache_template`
+  - `test_update_cache_cli_runs_via_subprocess_without_network`
+- 下一步：
+  1. 在 `simulate` 链路补充“逐 bar 持仓估值快照”的最小导出，增强中长线持仓复盘可观测性。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 模拟交易持仓快照增强）
+- 当前进展：
+  - `simulate` 的 `sim_equity_*.csv` 新增持仓快照字段：
+    - `position_side`
+    - `position_quantity`
+    - `position_entry_price`
+    - `position_mark_price`
+    - `position_unrealized_pnl`
+  - `sim_summary_*.json` 新增 `latest_position`（当前标的最新持仓快照，空仓为 `null`）。
+  - README 已补充新字段说明。
+- 新增回归测试：
+  - `test_cmd_simulate_supports_allocation_per_signal_dynamic_quantity` 扩展字段断言（持仓快照列 + 开平仓后数值变化 + `latest_position`）。
+- 下一步：
+  1. 继续推进模拟交易可维护性：补充 `simulate` 输出文件命名 `output_tag`，避免同策略不同参数覆盖工件。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 simulate 输出标签）
+- 当前进展：
+  - `simulate` 新增 `--output-tag`，输出文件改为：
+    - `sim_signals_<symbol>_<strategy>_<tag>.csv`
+    - `sim_equity_<symbol>_<strategy>_<tag>.csv`
+    - `sim_trades_<symbol>_<strategy>_<tag>.csv`
+    - `sim_summary_<symbol>_<strategy>_<tag>.json`
+  - `sim_summary` 新增 `output_tag` 字段，便于下游追踪批次。
+  - `run-config` 默认值与 schema 链路已兼容 `simulate.output_tag`。
+  - README 增加 `simulate --output-tag` 示例。
+- 新增回归测试：
+  - `test_parse_config_task_simulate_accepts_output_tag`
+  - `test_simulate_cli_output_tag_avoids_overwrite_via_subprocess`
+- 下一步：
+  1. 按 TASK 主线继续做“基线可运行性守门”，补一个离线端到端批处理模板（`update-cache -> mvp -> report`）以便日常巡检。
+- 阻塞：无。
+
+## 本轮摘要（2026-03-16 refresh_mvp_daily 批处理模板）
+- 当前进展：
+  - 新增模板 `examples/config.batch.refresh_mvp_daily.json`，默认串联：
+    - `update-cache`
+    - `mvp`
+    - `report`
+  - 模板支持 `vars(start/end)`，用于统一覆盖数据更新与 MVP 评估窗口。
+- 新增回归测试：
+  - `test_parse_config_tasks_supports_refresh_mvp_daily_batch_template`
+- 下一步：
+  1. 将该模板接入脚本化入口（`scripts/`）并补最小冒烟测试，降低定时任务接入成本。
+- 阻塞：无。
+
+## 约束更新（2026-03-16）
+- 新增硬约束已生效（即刻执行）：
+  - 目标远程仓库：`https://github.com/xiaozhang66666666/trading.git`
+  - 从本次开始，所有新增 commit message 必须使用中文。
+  - 新增/修改代码时，注释优先使用中文（在不影响可读性的前提下）。
+  - 推送前必须确保仓库状态整洁，并完成必要提交。
+- 执行策略：
+  - 由于当前 git 根目录在上级工作区，推送时采用“`market-signal-system` 子目录独立导出后推送”方案，避免把无关目录一并上传。
+
+## 本轮摘要（2026-03-16 推送主链路最小修复与新约束）
+- 当前进展：
+  - 发现阻塞：项目目录原本不是独立 Git 仓库，直接推送会混入上层工作区无关文件。
+  - 最小修复：已在当前项目目录初始化独立仓库（`git init`），恢复“本项目可单独整理/提交/推送”的主链路。
+  - 新硬约束已生效：
+    - 所有新的 commit message 必须使用中文。
+    - 新增/修改代码时优先使用中文注释。
+    - 推送前必须保证当前仓库状态整洁（`git status` clean）。
+- 下一步：
+  1. 完成必要提交，确保工作区 clean。
+  2. 绑定远程 `https://github.com/xiaozhang66666666/trading.git` 并推送。
+- 阻塞：当前待验证 GitHub 凭据/权限是否可写。

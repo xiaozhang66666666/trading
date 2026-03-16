@@ -1,0 +1,56 @@
+{
+  "command": "batch",
+  "vars": {
+    "symbol": "QQQ",
+    "start": "2018-01-01",
+    "end": "2025-01-01"
+  },
+  "tasks": [
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "macd_regime",
+      "start": "${start}",
+      "end": "${end}",
+      "output_tag": "macd_tight",
+      "params": {
+        "fast_span": 18,
+        "slow_span": 48,
+        "signal_span": 9,
+        "macd_ratio_threshold": 0.001
+      }
+    },
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "macd_regime",
+      "start": "${start}",
+      "end": "${end}",
+      "output_tag": "macd_base",
+      "params": {
+        "fast_span": 24,
+        "slow_span": 52,
+        "signal_span": 18,
+        "macd_ratio_threshold": 0.0005
+      }
+    },
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "macd_regime",
+      "start": "${start}",
+      "end": "${end}",
+      "output_tag": "macd_loose",
+      "params": {
+        "fast_span": 30,
+        "slow_span": 60,
+        "signal_span": 24,
+        "macd_ratio_threshold": 0.0003
+      }
+    },
+    {
+      "command": "report",
+      "output_file": "macd_sensitivity_report.md"
+    }
+  ]
+}

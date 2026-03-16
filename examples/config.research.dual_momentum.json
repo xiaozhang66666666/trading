@@ -1,0 +1,20 @@
+{
+  "command": "research",
+  "symbol": "QQQ",
+  "strategy": "dual_momentum",
+  "start": "2018-01-01",
+  "end": "2025-01-01",
+  "objective": "sharpe",
+  "train_bars": 504,
+  "test_bars": 126,
+  "fee_rate": 0.0008,
+  "slippage_bps": 5.0,
+  "grid": {
+    "fast_window": [42, 63, 84],
+    "slow_window": [189, 252],
+    "regime_window": [160, 200],
+    "fast_threshold": [0.015, 0.02, 0.03],
+    "slow_threshold": [0.04, 0.06, 0.08],
+    "volatility_quantile": [0.75, 0.8, 0.85]
+  }
+}

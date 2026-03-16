@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Signal Pilot Dashboard</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #0f766e;
+      --line: #e5e7eb;
+    }
+    body { margin: 0; font-family: "Segoe UI", "PingFang SC", sans-serif; background: var(--bg); color: var(--text); }
+    .shell { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+    .header { background: linear-gradient(120deg, #0f766e, #0d9488); color: #fff; border-radius: 14px; padding: 20px; }
+    .meta { font-size: 14px; opacity: .9; margin-top: 8px; }
+    .toolbar { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .toolbar select, .toolbar button { border-radius: 8px; border: 1px solid rgba(255,255,255,.3); padding: 8px 12px; }
+    .toolbar button { background: #fff; color: #0f766e; font-weight: 600; }
+    .stats { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .chip { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.2); border-radius: 999px; padding: 6px 10px; font-size: 13px; }
+    .table-wrap { margin-top: 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; font-size: 13px; text-align: left; white-space: nowrap; }
+    th { background: #f9fafb; color: #374151; }
+    .muted { color: var(--muted); }
+    .status-open { color: #0369a1; }
+    .status-closed { color: #166534; }
+    .status-expired { color: #92400e; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <h1 style="margin:0;">Signal Pilot</h1>
+      <div class="meta">账号：{{ account_id }}{% if display_name %}（{{ display_name }}）{% endif %} / 用户：{{ username }}</div>
+      <div class="stats">
+        <span class="chip">open: {{ status_counts.open }}</span>
+        <span class="chip">closed: {{ status_counts.closed }}</span>
+        <span class="chip">expired: {{ status_counts.expired }}</span>
+        <span class="chip">other: {{ status_counts.other }}</span>
+      </div>
+      <div class="toolbar">
+        <form method="get" action="/signal-pilot" style="display:flex; gap:10px; align-items:center;">
+          <label for="status" style="font-size:13px;">状态过滤</label>
+          <select id="status" name="status">
+            <option value="" {% if status_filter == "" %}selected{% endif %}>全部</option>
+            <option value="open" {% if status_filter == "open" %}selected{% endif %}>open</option>
+            <option value="closed" {% if status_filter == "closed" %}selected{% endif %}>closed</option>
+            <option value="expired" {% if status_filter == "expired" %}selected{% endif %}>expired</option>
+          </select>
+          <button type="submit">刷新</button>
+        </form>
+        <form method="post" action="/logout" style="margin-left:auto;">
+          <input name="csrf_token" type="hidden" value="{{ csrf_token }}" />
+          <button type="submit">退出登录</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>created_at</th>
+            <th>symbol</th>
+            <th>strategy</th>
+            <th>side</th>
+            <th>status</th>
+            <th>alert_price</th>
+            <th>current_pnl_pct</th>
+            <th>realized_pnl_pct</th>
+            <th>reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if alerts|length == 0 %}
+          <tr><td colspan="9" class="muted">当前账号暂无 Signal Pilot 记录。</td></tr>
+          {% endif %}
+          {% for row in alerts %}
+          <tr>
+            <td>{{ row.created_at }}</td>
+            <td>{{ row.symbol }}</td>
+            <td>{{ row.strategy }}</td>
+            <td>{{ row.side }}</td>
+            <td class="status-{{ row.status }}">{{ row.status }}</td>
+            <td>{{ row.alert_price }}</td>
+            <td>{{ row.current_pnl_pct }}</td>
+            <td>{{ row.realized_pnl_pct }}</td>
+            <td>{{ row.reason }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

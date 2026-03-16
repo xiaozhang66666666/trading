@@ -1,0 +1,16 @@
+{
+  "command": "simulate",
+  "symbol": "ETH",
+  "strategy": "momentum",
+  "start": "2022-01-01",
+  "end": "2025-01-01",
+  "state_file": "eth_alloc_paper.json",
+  "allocation_per_signal": 0.2,
+  "min_quantity": 0.01,
+  "params": {
+    "lookback": 120,
+    "volatility_window": 20,
+    "volatility_cap": 0.04,
+    "threshold": 0.03
+  }
+}

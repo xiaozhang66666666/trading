@@ -1,0 +1,66 @@
+{
+  "command": "batch",
+  "vars": {
+    "symbol": "QQQ",
+    "strategy": "macd_regime",
+    "start": "2020-01-01",
+    "end": "2025-01-01"
+  },
+  "tasks": [
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "params": {
+        "fast_span": 8,
+        "slow_span": 21,
+        "signal_span": 6,
+        "regime_window": 120,
+        "volatility_window": 20,
+        "volatility_max": 0.03,
+        "macd_ratio_threshold": 0.0005
+      },
+      "output_tag": "qqq_macd_fast8_slow21_regime120"
+    },
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "params": {
+        "fast_span": 12,
+        "slow_span": 26,
+        "signal_span": 9,
+        "regime_window": 150,
+        "volatility_window": 25,
+        "volatility_max": 0.035,
+        "macd_ratio_threshold": 0.0008
+      },
+      "output_tag": "qqq_macd_fast12_slow26_regime150"
+    },
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "params": {
+        "fast_span": 16,
+        "slow_span": 40,
+        "signal_span": 12,
+        "regime_window": 180,
+        "volatility_window": 30,
+        "volatility_max": 0.04,
+        "macd_ratio_threshold": 0.001
+      },
+      "output_tag": "qqq_macd_fast16_slow40_regime180"
+    },
+    {
+      "command": "report",
+      "output_file": "output_tag_compare_report.md"
+    }
+  ]
+}

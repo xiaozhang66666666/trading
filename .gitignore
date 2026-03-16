@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+data_cache/
+.DS_Store
+data/cache/
+data/state/
+outputs/
+monitor_runner.log
+.codex/
+.trash/
+MONITOR_LOG.md
+TASK_SIGNAL_PILOT.md

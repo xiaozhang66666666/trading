@@ -1,0 +1,65 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "vars": {
+    "start": "2020-01-01",
+    "end": "2025-01-01",
+    "as_of": "2026-03-16"
+  },
+  "summary_json": "baseline_alerts_daily_summary.json",
+  "summary_csv": "baseline_alerts_daily_summary.csv",
+  "tasks": [
+    {
+      "file": "config.mvp.json",
+      "vars": {
+        "start": "${start}",
+        "end": "${end}"
+      }
+    },
+    {
+      "file": "config.signal_pilot.scan.json",
+      "vars": {
+        "as_of": "${as_of}"
+      }
+    },
+    {
+      "file": "config.signal_pilot.dispatch.json"
+    },
+    {
+      "file": "config.signal_pilot.update.json",
+      "vars": {
+        "as_of": "${as_of}"
+      }
+    },
+    {
+      "file": "config.signal_pilot.report.json",
+      "vars": {
+        "as_of": "${as_of}"
+      }
+    },
+    {
+      "command": "report",
+      "output_file": "baseline_daily_report_index.md"
+    },
+    {
+      "command": "baseline-summary",
+      "as_of": "${as_of}",
+      "output_json": "baseline_daily_digest.alerts.json",
+      "output_csv": "baseline_daily_digest.alerts.csv",
+      "report_index_file": "baseline_daily_report_index.md",
+      "signal_alert_window_days": 30,
+      "signal_min_count": 3,
+      "signal_min_win_rate": 0.5,
+      "signal_min_avg_return_pct": 0.0,
+      "simulation_min_return_pct": -0.05,
+      "emit_alert_queue": true,
+      "alert_queue_file": "baseline_summary_alerts_daily.jsonl"
+    },
+    {
+      "command": "dispatch-alerts",
+      "queue_file": "baseline_summary_alerts_daily.jsonl",
+      "sink_file": "baseline_summary_alerts_dispatched_daily.jsonl",
+      "dry_run": false
+    }
+  ]
+}

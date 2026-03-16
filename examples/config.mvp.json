@@ -1,0 +1,19 @@
+{
+  "vars": {
+    "start": "2020-01-01",
+    "end": "2025-01-01"
+  },
+  "command": "mvp",
+  "start": "${start}",
+  "end": "${end}",
+  "symbols": ["QQQ", "ETH"],
+  "strategies": ["ma_cross", "donchian", "momentum"],
+  "simulate_strategy": "momentum",
+  "simulate_params": {
+    "lookback": 63,
+    "vol_window": 20,
+    "volatility_limit": 0.8
+  },
+  "interval": "1d",
+  "quantity": 1.0
+}

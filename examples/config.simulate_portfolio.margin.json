@@ -1,0 +1,25 @@
+{
+  "command": "simulate-portfolio",
+  "symbols": [
+    "QQQ",
+    "ETH"
+  ],
+  "strategy": "momentum",
+  "start": "2022-01-01",
+  "end": "2025-01-01",
+  "interval": "1d",
+  "state_file": "paper_portfolio_margin.json",
+  "allocation_per_signal": 0.35,
+  "max_symbol_allocation": 0.5,
+  "max_total_allocation": 1.4,
+  "initial_margin_rate": 0.7,
+  "cash_reserve_ratio": 0.1,
+  "max_portfolio_drawdown": 0.2,
+  "risk_cooldown_bars": 20,
+  "params": {
+    "momentum_window": 126,
+    "volatility_window": 20,
+    "momentum_threshold": 0.08,
+    "volatility_cap": 0.6
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "summary_json": "batch_portfolio_pipeline_summary.json",
+  "summary_csv": "batch_portfolio_pipeline_summary.csv",
+  "tasks": [
+    "config.fetch.qqq.json",
+    "config.fetch.eth.json",
+    "config.portfolio.rebalance.json",
+    "config.simulate_portfolio.margin.json",
+    "config.report.json"
+  ]
+}

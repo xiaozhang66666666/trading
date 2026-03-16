@@ -1,0 +1,29 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "summary_compress": "gzip",
+  "compress_naming": "strict",
+  "summary_json": "daily_strict_trace_summary.json.gz",
+  "summary_csv": "daily_strict_trace_summary.csv.gz",
+  "retry_count": 1,
+  "retry_delay_ms": 200,
+  "retry_enabled": true,
+  "retry_retryable_only": true,
+  "max_total_retries": 8,
+  "retry_budget_trace_compress": "gzip",
+  "retry_budget_trace_csv": "daily_strict_trace_retry_budget.csv.gz",
+  "tasks": [
+    {
+      "file": "config.fetch.qqq.json"
+    },
+    {
+      "file": "config.fetch.eth.json"
+    },
+    {
+      "file": "config.compare.json"
+    },
+    {
+      "file": "config.report.json"
+    }
+  ]
+}

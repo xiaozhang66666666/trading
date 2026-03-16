@@ -1,0 +1,13 @@
+{
+  "command": "backtest",
+  "symbol": "QQQ",
+  "strategy": "ma_cross",
+  "start": "2020-01-01",
+  "end": "2025-01-01",
+  "params": {
+    "fast_window": 40,
+    "slow_window": 180
+  },
+  "fee_rate": 0.0008,
+  "slippage_bps": 5.0
+}

@@ -1,0 +1,44 @@
+{
+  "command": "batch",
+  "vars": {
+    "symbol": "QQQ",
+    "strategy": "ma_cross",
+    "state_file": "paper_resume_demo.json",
+    "start_1": "2020-01-01",
+    "end_1": "2022-01-01",
+    "start_2": "2022-01-02",
+    "end_2": "2024-01-01"
+  },
+  "tasks": [
+    {
+      "command": "simulate",
+      "symbol": "${symbol}",
+      "strategy": "${strategy}",
+      "params": {
+        "fast_window": 40,
+        "slow_window": 180
+      },
+      "start": "${start_1}",
+      "end": "${end_1}",
+      "state_file": "${state_file}",
+      "quantity": 1.0
+    },
+    {
+      "command": "simulate",
+      "symbol": "${symbol}",
+      "strategy": "${strategy}",
+      "params": {
+        "fast_window": 40,
+        "slow_window": 180
+      },
+      "start": "${start_2}",
+      "end": "${end_2}",
+      "state_file": "${state_file}",
+      "quantity": 1.0
+    },
+    {
+      "command": "report",
+      "output_file": "simulate_resume_report.md"
+    }
+  ]
+}

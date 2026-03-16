@@ -1,0 +1,26 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "summary_compress": "gzip",
+  "compress_naming": "strict",
+  "summary_json": "daily_strict_summary.json.gz",
+  "summary_csv": "daily_strict_summary.csv.gz",
+  "retry_count": 1,
+  "retry_delay_ms": 200,
+  "retry_enabled": true,
+  "retry_retryable_only": true,
+  "tasks": [
+    {
+      "file": "config.fetch.qqq.json"
+    },
+    {
+      "file": "config.fetch.eth.json"
+    },
+    {
+      "file": "config.compare.json"
+    },
+    {
+      "file": "config.report.json"
+    }
+  ]
+}

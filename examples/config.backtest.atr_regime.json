@@ -1,0 +1,15 @@
+{
+  "command": "backtest",
+  "symbol": "QQQ",
+  "strategy": "atr_regime",
+  "start": "2020-01-01",
+  "end": "2025-01-01",
+  "params": {
+    "atr_window": 20,
+    "trend_window": 180,
+    "strength_threshold": 1.0,
+    "atr_cap_quantile": 0.8
+  },
+  "fee_rate": 0.0008,
+  "slippage_bps": 5.0
+}

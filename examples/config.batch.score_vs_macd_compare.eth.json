@@ -1,0 +1,57 @@
+{
+  "command": "batch",
+  "vars": {
+    "symbol": "ETH",
+    "start": "2019-01-01",
+    "end": "2025-01-01"
+  },
+  "tasks": [
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "score_regime",
+      "start": "${start}",
+      "end": "${end}",
+      "output_tag": "score_eth_base",
+      "params": {
+        "momentum_window": 84,
+        "trend_window": 150,
+        "mean_revert_window": 15,
+        "score_threshold": 0.3,
+        "momentum_weight": 0.45,
+        "trend_weight": 0.35,
+        "mean_revert_weight": 0.2,
+        "volatility_window": 20,
+        "volatility_ceiling": 0.03
+      }
+    },
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "macd_regime",
+      "start": "${start}",
+      "end": "${end}",
+      "output_tag": "macd_eth_base",
+      "params": {
+        "fast_span": 18,
+        "slow_span": 48,
+        "signal_span": 9,
+        "macd_ratio_threshold": 0.001,
+        "regime_window": 150,
+        "volatility_window": 20,
+        "volatility_ceiling": 0.03
+      }
+    },
+    {
+      "command": "compare",
+      "symbols": ["${symbol}"],
+      "strategies": ["score_regime", "macd_regime"],
+      "start": "${start}",
+      "end": "${end}"
+    },
+    {
+      "command": "report",
+      "output_file": "score_vs_macd_eth_report.md"
+    }
+  ]
+}

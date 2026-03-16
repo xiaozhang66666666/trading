@@ -1,0 +1,29 @@
+{
+  "command": "portfolio",
+  "symbols": [
+    "QQQ",
+    "ETH"
+  ],
+  "strategy": "momentum",
+  "start": "2020-01-01",
+  "end": "2025-01-01",
+  "interval": "1d",
+  "fee_rate": 0.0008,
+  "slippage_bps": 5.0,
+  "bars_per_year": 252,
+  "allocation_mode": "cov_vol_target",
+  "vol_window": 20,
+  "target_vol": 0.15,
+  "max_leverage": 1.5,
+  "drift_watch_threshold": 0.05,
+  "drift_high_threshold": 0.1,
+  "rebalance_on_drift": true,
+  "rebalance_trigger": "high",
+  "rebalance_scale": 1.0,
+  "params": {
+    "momentum_window": 126,
+    "volatility_window": 20,
+    "momentum_threshold": 0.08,
+    "volatility_cap": 0.6
+  }
+}

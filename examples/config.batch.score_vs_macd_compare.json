@@ -1,0 +1,54 @@
+{
+  "command": "batch",
+  "vars": {
+    "symbol": "QQQ",
+    "start": "2018-01-01",
+    "end": "2025-01-01"
+  },
+  "tasks": [
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "score_regime",
+      "start": "${start}",
+      "end": "${end}",
+      "output_tag": "score_base",
+      "params": {
+        "momentum_window": 126,
+        "trend_window": 200,
+        "mean_revert_window": 20,
+        "score_threshold": 0.25,
+        "momentum_weight": 0.4,
+        "trend_weight": 0.4,
+        "mean_revert_weight": 0.2
+      }
+    },
+    {
+      "command": "backtest",
+      "symbol": "${symbol}",
+      "strategy": "macd_regime",
+      "start": "${start}",
+      "end": "${end}",
+      "output_tag": "macd_base",
+      "params": {
+        "fast_span": 24,
+        "slow_span": 52,
+        "signal_span": 18,
+        "macd_ratio_threshold": 0.0005,
+        "regime_window": 180,
+        "volatility_window": 20
+      }
+    },
+    {
+      "command": "compare",
+      "symbols": ["${symbol}"],
+      "strategies": ["score_regime", "macd_regime"],
+      "start": "${start}",
+      "end": "${end}"
+    },
+    {
+      "command": "report",
+      "output_file": "score_vs_macd_report.md"
+    }
+  ]
+}

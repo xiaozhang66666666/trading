@@ -1,0 +1,61 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "vars": {
+    "as_of": "2026-03-16"
+  },
+  "tasks": [
+    {
+      "command": "scan-alerts",
+      "symbols": ["QQQ", "ETH"],
+      "strategy": "score_regime",
+      "params": {
+        "momentum_window": 63,
+        "trend_window": 120,
+        "mean_revert_window": 20,
+        "volatility_window": 30,
+        "score_threshold": 0.15,
+        "weights": [0.5, 0.3, 0.2]
+      },
+      "interval": "1d",
+      "lookback_days": 365,
+      "end": "${as_of}",
+      "account_id": "research",
+      "db_file": "market_signal_system.db",
+      "ledger_file": "signal_alert_ledger.csv",
+      "notification_file": "signal_pilot_notifications.research.jsonl"
+    },
+    {
+      "command": "dispatch-alerts",
+      "account_id": "research",
+      "db_file": "market_signal_system.db",
+      "queue_file": "signal_pilot_notifications.research.jsonl",
+      "ledger_file": "signal_alert_ledger.csv",
+      "sink_file": "signal_pilot_notifications_dispatched.research.jsonl",
+      "max_events": 200,
+      "timeout_sec": 10.0,
+      "retry_count": 1,
+      "retry_delay_ms": 500,
+      "idempotency_window_minutes": 5,
+      "dry_run": false
+    },
+    {
+      "command": "update-alerts",
+      "account_id": "research",
+      "db_file": "market_signal_system.db",
+      "end": "${as_of}",
+      "max_holding_days": 60,
+      "close_on_reverse": true,
+      "ledger_file": "signal_alert_ledger.csv"
+    },
+    {
+      "command": "report-alerts",
+      "account_id": "research",
+      "db_file": "market_signal_system.db",
+      "as_of": "${as_of}",
+      "windows": "7,30,60",
+      "output_prefix": "signal_pilot_alert_report_daily.research",
+      "ledger_file": "signal_alert_ledger.csv"
+    }
+  ]
+}

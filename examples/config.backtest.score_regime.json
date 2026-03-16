@@ -1,0 +1,18 @@
+{
+  "command": "backtest",
+  "symbol": "QQQ",
+  "strategy": "score_regime",
+  "start": "2018-01-01",
+  "end": "2025-01-01",
+  "params": {
+    "momentum_window": 126,
+    "trend_window": 200,
+    "mean_revert_window": 20,
+    "score_threshold": 0.25,
+    "momentum_weight": 0.4,
+    "trend_weight": 0.35,
+    "mean_revert_weight": 0.25
+  },
+  "fee_rate": 0.0008,
+  "slippage_bps": 5.0
+}

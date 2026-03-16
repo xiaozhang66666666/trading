@@ -1,0 +1,11 @@
+{
+  "vars": {
+    "as_of": "2026-03-16"
+  },
+  "command": "update-alerts",
+  "account_id": "default",
+  "end": "${as_of}",
+  "max_holding_days": 60,
+  "close_on_reverse": true,
+  "ledger_file": "signal_alert_ledger.csv"
+}

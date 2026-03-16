@@ -1,0 +1,20 @@
+command: batch
+vars:
+  start: "2020-01-01"
+  end: "2025-01-01"
+  run_tag: mvp_daily
+tasks:
+  - command: mvp
+    start: "${start}"
+    end: "${end}"
+    run_tag: "${run_tag}"
+    symbols:
+      - QQQ
+      - ETH
+    strategies:
+      - ma_cross
+      - donchian
+      - momentum
+    simulate_strategy: momentum
+  - command: report
+    output_file: report_index.md

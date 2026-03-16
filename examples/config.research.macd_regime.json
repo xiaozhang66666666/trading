@@ -1,0 +1,16 @@
+{
+  "command": "research",
+  "symbol": "QQQ",
+  "strategy": "macd_regime",
+  "start": "2018-01-01",
+  "end": "2025-01-01",
+  "objective": "sharpe",
+  "train_bars": 504,
+  "test_bars": 126,
+  "grid": {
+    "fast_span": [18, 24],
+    "slow_span": [48, 52],
+    "signal_span": [9, 18],
+    "macd_ratio_threshold": [0.0005, 0.001]
+  }
+}

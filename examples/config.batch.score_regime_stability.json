@@ -1,0 +1,35 @@
+{
+  "command": "batch",
+  "vars": {
+    "symbol": "QQQ",
+    "strategy": "score_regime",
+    "start": "2018-01-01",
+    "end": "2025-01-01"
+  },
+  "tasks": [
+    {
+      "command": "research",
+      "symbol": "${symbol}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "objective": "sharpe",
+      "train_bars": 504,
+      "test_bars": 126,
+      "grid": {
+        "momentum_window": [84, 126],
+        "trend_window": [150, 200],
+        "mean_revert_window": [15, 20],
+        "score_threshold": [0.2, 0.25]
+      }
+    },
+    {
+      "command": "stability",
+      "walk_forward_file": "outputs/walk_forward_${symbol}_${strategy}.csv"
+    },
+    {
+      "command": "report",
+      "output_file": "score_regime_stability_report.md"
+    }
+  ]
+}

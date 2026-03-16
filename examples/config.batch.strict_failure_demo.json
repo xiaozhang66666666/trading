@@ -1,0 +1,26 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "compress_naming": "strict",
+  "summary_compress": "gzip",
+  "summary_json": "strict_failure_summary.json.gz",
+  "summary_csv": "strict_failure_summary.csv.gz",
+  "retry_count": 1,
+  "retry_retryable_only": false,
+  "max_total_retries": 1,
+  "retry_budget_trace_compress": "gzip",
+  "retry_budget_trace_csv": "strict_failure_retry_trace.csv.gz",
+  "tasks": [
+    {
+      "command": "report",
+      "output_file": "strict_failure_pre_report.md"
+    },
+    {
+      "command": "unknown-task"
+    },
+    {
+      "command": "report",
+      "output_file": "strict_failure_post_report.md"
+    }
+  ]
+}

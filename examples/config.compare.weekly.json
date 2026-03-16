@@ -1,0 +1,8 @@
+{
+  "command": "compare",
+  "symbols": ["QQQ", "ETH"],
+  "strategies": ["ma_cross", "donchian", "momentum", "regime", "macd_regime", "atr_regime", "score_regime", "dual_momentum"],
+  "start": "2020-01-01",
+  "end": "2025-01-01",
+  "interval": "1wk"
+}

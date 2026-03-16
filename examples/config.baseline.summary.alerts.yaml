@@ -1,0 +1,12 @@
+command: baseline-summary
+as_of: "2026-03-16"
+output_json: baseline_daily_digest.alerts.json
+output_csv: baseline_daily_digest.alerts.csv
+report_index_file: baseline_daily_report_index.md
+signal_alert_window_days: 30
+signal_min_count: 3
+signal_min_win_rate: 0.5
+signal_min_avg_return_pct: 0.0
+simulation_min_return_pct: -0.05
+emit_alert_queue: true
+alert_queue_file: baseline_summary_alerts.jsonl

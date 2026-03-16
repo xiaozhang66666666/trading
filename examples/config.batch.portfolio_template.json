@@ -1,0 +1,64 @@
+{
+  "command": "batch",
+  "on_error": "continue",
+  "retry_count": 2,
+  "retry_delay_ms": 500,
+  "retry_retryable_only": true,
+  "max_total_retries": 6,
+  "vars": {
+    "start": "2020-01-01",
+    "end": "2025-01-01",
+    "symbols": "QQQ,ETH",
+    "strategy": "momentum",
+    "tag": "qqq_eth_momentum"
+  },
+  "summary_json": "batch_${tag}_summary.json",
+  "summary_csv": "batch_${tag}_summary.csv",
+  "tasks": [
+    {
+      "command": "fetch",
+      "symbol": "QQQ",
+      "start": "${start}",
+      "end": "${end}",
+      "retry": {
+        "enabled": true,
+        "count": 3,
+        "delay_ms": 800,
+        "retryable_only": true
+      }
+    },
+    {
+      "command": "fetch",
+      "symbol": "ETH",
+      "start": "${start}",
+      "end": "${end}"
+    },
+    {
+      "command": "portfolio",
+      "symbols": "${symbols}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "allocation_mode": "cov_vol_target",
+      "target_vol": 0.15,
+      "max_leverage": 1.5
+    },
+    {
+      "command": "simulate-portfolio",
+      "symbols": "${symbols}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "allocation_per_signal": 0.3,
+      "max_symbol_allocation": 0.4,
+      "max_total_allocation": 1.0,
+      "initial_margin_rate": 1.0,
+      "cash_reserve_ratio": 0.05,
+      "state_file": "paper_portfolio_${tag}.json"
+    },
+    {
+      "command": "report",
+      "output_file": "report_index_${tag}.md"
+    }
+  ]
+}

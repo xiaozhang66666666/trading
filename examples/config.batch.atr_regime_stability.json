@@ -1,0 +1,35 @@
+{
+  "command": "batch",
+  "vars": {
+    "symbol": "QQQ",
+    "strategy": "atr_regime",
+    "start": "2018-01-01",
+    "end": "2025-01-01"
+  },
+  "tasks": [
+    {
+      "command": "research",
+      "symbol": "${symbol}",
+      "strategy": "${strategy}",
+      "start": "${start}",
+      "end": "${end}",
+      "objective": "sharpe",
+      "train_bars": 504,
+      "test_bars": 126,
+      "grid": {
+        "atr_window": [14, 20, 30],
+        "trend_window": [120, 180, 220],
+        "strength_threshold": [0.8, 1.0, 1.3],
+        "atr_cap_quantile": [0.7, 0.8, 0.9]
+      }
+    },
+    {
+      "command": "stability",
+      "walk_forward_file": "outputs/walk_forward_${symbol}_${strategy}.csv"
+    },
+    {
+      "command": "report",
+      "output_file": "atr_regime_stability_report.md"
+    }
+  ]
+}

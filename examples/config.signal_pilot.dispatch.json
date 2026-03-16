@@ -1,0 +1,13 @@
+{
+  "command": "dispatch-alerts",
+  "account_id": "default",
+  "queue_file": "signal_pilot_notifications.jsonl",
+  "ledger_file": "signal_alert_ledger.csv",
+  "sink_file": "signal_pilot_notifications_dispatched.jsonl",
+  "max_events": 200,
+  "timeout_sec": 10.0,
+  "retry_count": 0,
+  "retry_delay_ms": 500,
+  "idempotency_window_minutes": 0.0,
+  "dry_run": false
+}

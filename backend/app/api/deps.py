@@ -11,6 +11,8 @@ from app.services.run_instance_service import RunInstanceService
 from app.services.signal_engine_service import SignalEngineService
 from app.services.strategy_service import StrategyService
 from app.services.symbol_service import SymbolService
+from app.services.system_health_service import SystemHealthService
+from app.services.system_settings_service import SystemSettingsService
 from app.services.trade_ledger_service import TradeLedgerService
 from app.services.symbol_view_assembler import SymbolViewAssembler
 from app.services.watchlist_service import WatchlistService
@@ -74,4 +76,14 @@ def get_notification_service() -> NotificationService:
 @lru_cache
 def get_trade_ledger_service() -> TradeLedgerService:
     return TradeLedgerService()
+
+
+@lru_cache
+def get_system_settings_service() -> SystemSettingsService:
+    return SystemSettingsService()
+
+
+@lru_cache
+def get_system_health_service() -> SystemHealthService:
+    return SystemHealthService(symbol_service=get_symbol_service(), run_service=get_run_instance_service())
 from app.services.backtest_service import BacktestService

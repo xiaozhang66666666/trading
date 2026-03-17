@@ -292,3 +292,24 @@ class PnlSummary(BaseModel):
     realized_pnl: float
     unrealized_pnl: float
     total_pnl: float
+
+
+class SystemSettings(BaseModel):
+    preferred_us_provider: str = "alpaca"
+    fallback_us_provider: str = "twelve_data"
+    default_fee_rate: float = 0.0005
+    default_slippage_rate: float = 0.0005
+    timezone: str = "UTC"
+    us_pre_market_start: str = "04:00"
+    us_regular_start: str = "09:30"
+    us_regular_end: str = "16:00"
+    us_after_market_end: str = "20:00"
+
+
+class SystemHealth(BaseModel):
+    api_status: str
+    data_sources: list[DataSourceStatus]
+    running_instances: int
+    paused_instances: int
+    stopped_instances: int
+    errors: list[str]

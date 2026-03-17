@@ -13,6 +13,8 @@ import {
   deleteStrategy,
   getDataSources,
   getPnlSummary,
+  getSystemHealth,
+  getSystemSettings,
   getHistoryKlines,
   listPositionLogs,
   listStrategies,
@@ -27,6 +29,7 @@ import {
   runBacktest,
   searchSymbols,
   tickSignalEngine,
+  updateSystemSettings,
 } from "./api";
 import type {
   BacktestResult,
@@ -45,6 +48,8 @@ import type {
   StrategyRecord,
   StrategyTemplate,
   SymbolView,
+  SystemHealth,
+  SystemSettings,
   TradeLog,
 } from "./types";
 
@@ -261,6 +266,9 @@ export default function App() {
   const [positionLogs, setPositionLogs] = useState<PositionLog[]>([]);
   const [tradeLogs, setTradeLogs] = useState<TradeLog[]>([]);
   const [pnlSummary, setPnlSummary] = useState<PnlSummary | null>(null);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
+  const [systemError, setSystemError] = useState("");
   const [strategyForm, setStrategyForm] = useState<StrategyPayload>({
     name: "策略A",
     template: "MA_CROSS",
@@ -309,6 +317,12 @@ export default function App() {
     setPositionLogs(positions);
     setTradeLogs(trades);
     setPnlSummary(pnl);
+  }
+
+  async function refreshSystem() {
+    const [settings, health] = await Promise.all([getSystemSettings(), getSystemHealth()]);
+    setSystemSettings(settings);
+    setSystemHealth(health);
   }
 
   async function loadHistory(symbol = activeSymbol, interval = activeInterval, force = false) {
@@ -423,6 +437,17 @@ export default function App() {
     await refreshNotifications();
   }
 
+  async function saveSystemSettings() {
+    if (!systemSettings) return;
+    setSystemError("");
+    try {
+      await updateSystemSettings(systemSettings);
+      await refreshSystem();
+    } catch (err: unknown) {
+      setSystemError(err instanceof Error ? err.message : "系统设置保存失败");
+    }
+  }
+
   async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
     setLoading(true);
     setError("");
@@ -453,6 +478,7 @@ export default function App() {
     void refreshSignals();
     void refreshNotifications();
     void refreshLogs();
+    void refreshSystem();
   }, []);
 
   useEffect(() => {
@@ -942,6 +968,72 @@ export default function App() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="system-panel">
+          <div className="panel-title-row">
+            <h3>设置与系统控制（T1-10）</h3>
+            <button type="button" onClick={() => void saveSystemSettings()}>
+              保存设置
+            </button>
+          </div>
+          {systemSettings ? (
+            <div className="history-meta">
+              <span>美股主数据源</span>
+              <input
+                value={systemSettings.preferred_us_provider}
+                onChange={(event) =>
+                  setSystemSettings((prev) => (prev ? { ...prev, preferred_us_provider: event.target.value } : prev))
+                }
+              />
+              <span>美股备份源</span>
+              <input
+                value={systemSettings.fallback_us_provider}
+                onChange={(event) =>
+                  setSystemSettings((prev) => (prev ? { ...prev, fallback_us_provider: event.target.value } : prev))
+                }
+              />
+              <span>默认手续费</span>
+              <input
+                type="number"
+                step="0.0001"
+                value={systemSettings.default_fee_rate}
+                onChange={(event) =>
+                  setSystemSettings((prev) => (prev ? { ...prev, default_fee_rate: Number(event.target.value) } : prev))
+                }
+              />
+              <span>默认滑点</span>
+              <input
+                type="number"
+                step="0.0001"
+                value={systemSettings.default_slippage_rate}
+                onChange={(event) =>
+                  setSystemSettings((prev) =>
+                    prev ? { ...prev, default_slippage_rate: Number(event.target.value) } : prev,
+                  )
+                }
+              />
+              <span>时区</span>
+              <input
+                value={systemSettings.timezone}
+                onChange={(event) =>
+                  setSystemSettings((prev) => (prev ? { ...prev, timezone: event.target.value } : prev))
+                }
+              />
+            </div>
+          ) : (
+            <div className="hint">系统设置加载中...</div>
+          )}
+          {systemError ? <div className="error">{systemError}</div> : null}
+          {systemHealth ? (
+            <div className="backtest-metrics">
+              <span>API：{systemHealth.api_status}</span>
+              <span>运行中：{systemHealth.running_instances}</span>
+              <span>暂停：{systemHealth.paused_instances}</span>
+              <span>已停止：{systemHealth.stopped_instances}</span>
+              <span>异常数：{systemHealth.errors.length}</span>
+            </div>
+          ) : null}
         </div>
       </aside>
     </div>

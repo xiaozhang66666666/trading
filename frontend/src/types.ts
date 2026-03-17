@@ -208,3 +208,29 @@ export interface PnlSummary {
   unrealized_pnl: number;
   total_pnl: number;
 }
+
+export interface SystemSettings {
+  preferred_us_provider: string;
+  fallback_us_provider: string;
+  default_fee_rate: number;
+  default_slippage_rate: number;
+  timezone: string;
+  us_pre_market_start: string;
+  us_regular_start: string;
+  us_regular_end: string;
+  us_after_market_end: string;
+}
+
+export interface SystemHealth {
+  api_status: string;
+  data_sources: {
+    name: string;
+    state: string;
+    detail: string;
+    checked_at: string;
+  }[];
+  running_instances: number;
+  paused_instances: number;
+  stopped_instances: number;
+  errors: string[];
+}

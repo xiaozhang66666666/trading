@@ -13,6 +13,8 @@ import type {
   PnlSummary,
   PositionLog,
   SignalRecord,
+  SystemHealth,
+  SystemSettings,
   TradeLog,
   SymbolView,
 } from "./types";
@@ -158,4 +160,19 @@ export function getPnlSummary(): Promise<PnlSummary> {
 
 export function buildLogsExportUrl(): string {
   return `${API_BASE}/api/v1/logs/export.csv`;
+}
+
+export function getSystemSettings(): Promise<SystemSettings> {
+  return fetchJson<SystemSettings>("/api/v1/system/settings");
+}
+
+export function updateSystemSettings(payload: SystemSettings): Promise<SystemSettings> {
+  return fetchJson<SystemSettings>("/api/v1/system/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getSystemHealth(): Promise<SystemHealth> {
+  return fetchJson<SystemHealth>("/api/v1/system/health");
 }

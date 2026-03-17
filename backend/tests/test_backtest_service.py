@@ -7,6 +7,7 @@ from app.core.models import (
     BacktestRequest,
     BacktestScanRequest,
     ScanRange,
+    PortfolioBacktestRequest,
     Kline,
     MarketType,
     StrategyDirectionConfig,
@@ -123,6 +124,44 @@ class BacktestServiceTest(unittest.TestCase):
         )
         self.assertEqual(len(compare.items), 1)
         self.assertEqual(compare.items[0].strategy_id, "s1")
+
+    def test_run_portfolio(self) -> None:
+        service = BacktestService(market_data=_FakeMarketData())
+        payload = StrategyPayload(
+            name="策略A",
+            template=StrategyTemplate.MA_CROSS,
+            interval="1m",
+            open_condition="MA5 上穿 MA20",
+            close_condition="MA5 下穿 MA20",
+            take_profit=2,
+            stop_loss=1,
+            position_size=0.3,
+            direction=StrategyDirectionConfig(allow_long=True, allow_short=True, include_extended_hours=False),
+            json_dsl='{"strategy":{},"indicators":[],"conditions":{},"entry_long":{},"exit_long":{},"entry_short":{},"exit_short":{},"risk":{}}',
+        )
+        strategy = StrategyRecord(
+            id="s1",
+            name="策略A",
+            current_version=1,
+            updated_at=datetime.now(tz=timezone.utc).isoformat(),
+            latest_payload=payload,
+            versions=[StrategyVersion(version=1, created_at=datetime.now(tz=timezone.utc).isoformat(), payload=payload)],
+        )
+        symbols = [
+            Symbol(code="ETH", name="Ethereum", market=MarketType.CRYPTO, datasource="binance"),
+            Symbol(code="QQQ", name="QQQ", market=MarketType.US_EQUITY, datasource="us_equity_realtime"),
+        ]
+
+        result = asyncio.run(
+            service.run_portfolio(
+                PortfolioBacktestRequest(strategy_id="s1", symbols=["ETH", "QQQ"], interval="1m"),
+                symbols=symbols,
+                strategy=strategy,
+            )
+        )
+
+        self.assertEqual(len(result.items), 2)
+        self.assertGreaterEqual(len(result.portfolio_equity_curve), 0)
 
 
 if __name__ == "__main__":

@@ -281,6 +281,33 @@ class BacktestCompareResult(BaseModel):
     items: list[BacktestCompareItem]
 
 
+class PortfolioItemResult(BaseModel):
+    symbol: str
+    metrics: BacktestMetrics
+    trades: int
+
+
+class PortfolioBacktestRequest(BaseModel):
+    strategy_id: str
+    symbols: list[str]
+    interval: str = "15m"
+    initial_capital: float = 100000
+    fee_rate: float = 0.0005
+    slippage_rate: float = 0.0005
+    allow_long: bool = True
+    allow_short: bool = True
+    include_extended_hours: bool = False
+
+
+class PortfolioBacktestResult(BaseModel):
+    strategy_id: str
+    symbols: list[str]
+    interval: str
+    portfolio_metrics: BacktestMetrics
+    portfolio_equity_curve: list[EquityPoint]
+    items: list[PortfolioItemResult]
+
+
 class RunStatus(str, Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"

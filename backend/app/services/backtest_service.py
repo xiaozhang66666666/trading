@@ -16,6 +16,9 @@ from app.core.models import (
     BacktestTrade,
     EquityPoint,
     Kline,
+    PortfolioBacktestRequest,
+    PortfolioBacktestResult,
+    PortfolioItemResult,
     ScanRange,
     StrategyRecord,
     StrategyTemplate,
@@ -309,3 +312,105 @@ class BacktestService:
 
         items.sort(key=lambda item: self._metric_value(item.metrics, request.sort_by), reverse=True)
         return BacktestCompareResult(symbol=request.symbol, interval=request.interval, sort_by=request.sort_by, items=items)
+
+    @staticmethod
+    def _max_drawdown(equities: list[float]) -> float:
+        if not equities:
+            return 0.0
+        peak = equities[0]
+        max_dd = 0.0
+        for value in equities:
+            peak = max(peak, value)
+            dd = (peak - value) / peak if peak else 0.0
+            max_dd = max(max_dd, dd)
+        return max_dd
+
+    async def run_portfolio(
+        self,
+        request: PortfolioBacktestRequest,
+        symbols: list[Symbol],
+        strategy: StrategyRecord,
+    ) -> PortfolioBacktestResult:
+        results: list[BacktestResult] = []
+        item_results: list[PortfolioItemResult] = []
+        for symbol in symbols:
+            single = await self.run(
+                BacktestRequest(
+                    strategy_id=request.strategy_id,
+                    symbol=symbol.code,
+                    interval=request.interval,
+                    initial_capital=request.initial_capital,
+                    fee_rate=request.fee_rate,
+                    slippage_rate=request.slippage_rate,
+                    allow_long=request.allow_long,
+                    allow_short=request.allow_short,
+                    include_extended_hours=request.include_extended_hours,
+                ),
+                symbol=symbol,
+                strategy=strategy,
+            )
+            results.append(single)
+            item_results.append(
+                PortfolioItemResult(
+                    symbol=symbol.code,
+                    metrics=single.metrics,
+                    trades=single.metrics.trade_count,
+                )
+            )
+
+        if not results:
+            empty_metrics = BacktestMetrics(
+                total_return=0,
+                annual_return=0,
+                max_drawdown=0,
+                win_rate=0,
+                trade_count=0,
+                profit_loss_ratio=0,
+                profit_factor=0,
+            )
+            return PortfolioBacktestResult(
+                strategy_id=request.strategy_id,
+                symbols=[],
+                interval=request.interval,
+                portfolio_metrics=empty_metrics,
+                portfolio_equity_curve=[],
+                items=[],
+            )
+
+        min_length = min((len(item.equity_curve) for item in results), default=0)
+        curve: list[EquityPoint] = []
+        if min_length > 0:
+            for idx in range(min_length):
+                returns = [(result.equity_curve[idx].equity / request.initial_capital) - 1 for result in results]
+                avg_return = sum(returns) / len(returns)
+                equity = request.initial_capital * (1 + avg_return)
+                curve.append(EquityPoint(time=results[0].equity_curve[idx].time, equity=equity))
+
+        portfolio_total_return = 0.0
+        if curve and request.initial_capital:
+            portfolio_total_return = (curve[-1].equity - request.initial_capital) / request.initial_capital
+        weighted_trade_count = sum(item.metrics.trade_count for item in results)
+        weighted_win = sum(item.metrics.win_rate * item.metrics.trade_count for item in results)
+        win_rate = (weighted_win / weighted_trade_count) if weighted_trade_count else 0.0
+        avg_profit_factor = sum(item.metrics.profit_factor for item in results) / len(results)
+        avg_pl_ratio = sum(item.metrics.profit_loss_ratio for item in results) / len(results)
+        max_drawdown = self._max_drawdown([point.equity for point in curve])
+
+        portfolio_metrics = BacktestMetrics(
+            total_return=portfolio_total_return,
+            annual_return=portfolio_total_return * sqrt(365) if portfolio_total_return > -1 else -1,
+            max_drawdown=max_drawdown,
+            win_rate=win_rate,
+            trade_count=weighted_trade_count,
+            profit_loss_ratio=avg_pl_ratio,
+            profit_factor=avg_profit_factor,
+        )
+
+        return PortfolioBacktestResult(
+            strategy_id=request.strategy_id,
+            symbols=[symbol.code for symbol in symbols],
+            interval=request.interval,
+            portfolio_metrics=portfolio_metrics,
+            portfolio_equity_curve=curve,
+            items=item_results,
+        )

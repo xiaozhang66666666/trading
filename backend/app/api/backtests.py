@@ -10,6 +10,8 @@ from app.core.models import (
     BacktestResult,
     BacktestScanRequest,
     BacktestScanResult,
+    PortfolioBacktestRequest,
+    PortfolioBacktestResult,
 )
 from app.services.backtest_service import BacktestService
 from app.services.strategy_service import StrategyService
@@ -74,3 +76,25 @@ async def run_backtest_compare(
         raise HTTPException(status_code=404, detail="策略不存在")
 
     return await backtest_service.compare(payload, symbol=symbol, strategies=strategies)
+
+
+@router.post("/portfolio", response_model=PortfolioBacktestResult)
+async def run_portfolio_backtest(
+    payload: PortfolioBacktestRequest,
+    symbol_service: SymbolService = Depends(get_symbol_service),
+    strategy_service: StrategyService = Depends(get_strategy_service),
+    backtest_service: BacktestService = Depends(get_backtest_service),
+) -> PortfolioBacktestResult:
+    strategy = strategy_service.get(payload.strategy_id)
+    if not strategy:
+        raise HTTPException(status_code=404, detail="策略不存在")
+
+    symbols = []
+    for code in payload.symbols:
+        symbol = symbol_service.get_symbol(code)
+        if symbol:
+            symbols.append(symbol)
+    if not symbols:
+        raise HTTPException(status_code=404, detail="标的不存在")
+
+    return await backtest_service.run_portfolio(payload, symbols=symbols, strategy=strategy)

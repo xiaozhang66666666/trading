@@ -11,9 +11,11 @@ import {
   getMarketKlines,
   getMarketOverview,
   refreshHistoryKlines,
+  runBacktest,
   searchSymbols,
 } from "./api";
 import type {
+  BacktestResult,
   DataSourceStatus,
   DataState,
   HistoryDataset,
@@ -217,6 +219,9 @@ export default function App() {
   const [strategies, setStrategies] = useState<StrategyRecord[]>([]);
   const [strategyError, setStrategyError] = useState("");
   const [strategySaving, setStrategySaving] = useState(false);
+  const [backtestError, setBacktestError] = useState("");
+  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
   const [strategyForm, setStrategyForm] = useState<StrategyPayload>({
     name: "策略A",
     template: "MA_CROSS",
@@ -278,6 +283,33 @@ export default function App() {
   async function onDeleteStrategy(strategyId: string) {
     await deleteStrategy(strategyId);
     await refreshStrategies();
+  }
+
+  async function startBacktest() {
+    if (strategies.length === 0) {
+      setBacktestError("请先创建策略");
+      return;
+    }
+    setBacktestError("");
+    setBacktestLoading(true);
+    try {
+      const result = await runBacktest({
+        strategy_id: strategies[0].id,
+        symbol: activeSymbol,
+        interval: activeInterval,
+        initial_capital: 100000,
+        fee_rate: 0.0005,
+        slippage_rate: 0.0005,
+        allow_long: true,
+        allow_short: true,
+        include_extended_hours: false,
+      });
+      setBacktestResult(result);
+    } catch (err: unknown) {
+      setBacktestError(err instanceof Error ? err.message : "回测失败");
+    } finally {
+      setBacktestLoading(false);
+    }
   }
 
   async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
@@ -582,6 +614,60 @@ export default function App() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="backtest-panel">
+          <div className="panel-title-row">
+            <h3>回测系统（T1-05）</h3>
+            <button type="button" onClick={() => void startBacktest()} disabled={backtestLoading}>
+              {backtestLoading ? "回测中..." : "运行回测"}
+            </button>
+          </div>
+          <div className="history-meta">
+            <span>策略：{strategies[0]?.name ?? "-"}</span>
+            <span>标的：{activeSymbol}</span>
+            <span>周期：{activeInterval}</span>
+            <span>模式：多空双向</span>
+          </div>
+          {backtestError ? <div className="error">{backtestError}</div> : null}
+          {backtestResult ? (
+            <>
+              <div className="backtest-metrics">
+                <span>总收益：{(backtestResult.metrics.total_return * 100).toFixed(2)}%</span>
+                <span>年化：{(backtestResult.metrics.annual_return * 100).toFixed(2)}%</span>
+                <span>最大回撤：{(backtestResult.metrics.max_drawdown * 100).toFixed(2)}%</span>
+                <span>胜率：{(backtestResult.metrics.win_rate * 100).toFixed(2)}%</span>
+                <span>交易次数：{backtestResult.metrics.trade_count}</span>
+                <span>Profit Factor：{backtestResult.metrics.profit_factor.toFixed(3)}</span>
+              </div>
+              <div className="equity-preview">
+                资金曲线点数：{backtestResult.equity_curve.length}，最后权益：
+                {formatNumber(backtestResult.equity_curve[backtestResult.equity_curve.length - 1]?.equity ?? 0, 2)}
+              </div>
+              <div className="trade-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>方向</th>
+                      <th>开仓时间</th>
+                      <th>平仓时间</th>
+                      <th>盈亏</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backtestResult.trades.slice(0, 20).map((trade, idx) => (
+                      <tr key={`${trade.entry_time}_${idx}`}>
+                        <td>{trade.side}</td>
+                        <td>{new Date(trade.entry_time).toLocaleString("zh-CN")}</td>
+                        <td>{new Date(trade.exit_time).toLocaleString("zh-CN")}</td>
+                        <td className={trade.pnl >= 0 ? "up" : "down"}>{formatNumber(trade.pnl, 2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
         </div>
       </aside>
     </div>

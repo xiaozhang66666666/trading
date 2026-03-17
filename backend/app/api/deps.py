@@ -45,3 +45,9 @@ def get_history_data_service() -> HistoryDataService:
 @lru_cache
 def get_strategy_service() -> StrategyService:
     return StrategyService()
+
+
+@lru_cache
+def get_backtest_service() -> BacktestService:
+    return BacktestService(market_data=get_market_data_service())
+from app.services.backtest_service import BacktestService

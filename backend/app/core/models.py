@@ -150,3 +150,49 @@ class StrategyRecord(BaseModel):
     updated_at: str
     latest_payload: StrategyPayload
     versions: list[StrategyVersion]
+
+
+class BacktestRequest(BaseModel):
+    strategy_id: str
+    symbol: str
+    interval: str = "15m"
+    initial_capital: float = 100000
+    fee_rate: float = 0.0005
+    slippage_rate: float = 0.0005
+    allow_long: bool = True
+    allow_short: bool = True
+    include_extended_hours: bool = False
+
+
+class BacktestTrade(BaseModel):
+    side: str
+    entry_time: str
+    entry_price: float
+    exit_time: str
+    exit_price: float
+    qty: float
+    pnl: float
+    reason: str
+
+
+class EquityPoint(BaseModel):
+    time: str
+    equity: float
+
+
+class BacktestMetrics(BaseModel):
+    total_return: float
+    annual_return: float
+    max_drawdown: float
+    win_rate: float
+    trade_count: int
+    profit_loss_ratio: float
+    profit_factor: float
+
+
+class BacktestResult(BaseModel):
+    symbol: str
+    interval: str
+    metrics: BacktestMetrics
+    trades: list[BacktestTrade]
+    equity_curve: list[EquityPoint]

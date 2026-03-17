@@ -1,4 +1,6 @@
 import type {
+  BacktestRequest,
+  BacktestResult,
   DataSourceStatus,
   HistoryDataset,
   Kline,
@@ -75,5 +77,12 @@ export function copyStrategy(strategyId: string): Promise<StrategyRecord> {
 export function deleteStrategy(strategyId: string): Promise<{ status: string }> {
   return fetchJson<{ status: string }>(`/api/v1/strategies/${strategyId}`, {
     method: "DELETE",
+  });
+}
+
+export function runBacktest(payload: BacktestRequest): Promise<BacktestResult> {
+  return fetchJson<BacktestResult>("/api/v1/backtests/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

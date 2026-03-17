@@ -91,3 +91,47 @@ export interface StrategyRecord {
   updated_at: string;
   latest_payload: StrategyPayload;
 }
+
+export interface BacktestRequest {
+  strategy_id: string;
+  symbol: string;
+  interval: string;
+  initial_capital: number;
+  fee_rate: number;
+  slippage_rate: number;
+  allow_long: boolean;
+  allow_short: boolean;
+  include_extended_hours: boolean;
+}
+
+export interface BacktestTrade {
+  side: string;
+  entry_time: string;
+  entry_price: number;
+  exit_time: string;
+  exit_price: number;
+  qty: number;
+  pnl: number;
+  reason: string;
+}
+
+export interface EquityPoint {
+  time: string;
+  equity: number;
+}
+
+export interface BacktestResult {
+  symbol: string;
+  interval: string;
+  metrics: {
+    total_return: number;
+    annual_return: number;
+    max_drawdown: number;
+    win_rate: number;
+    trade_count: number;
+    profit_loss_ratio: number;
+    profit_factor: number;
+  };
+  trades: BacktestTrade[];
+  equity_curve: EquityPoint[];
+}

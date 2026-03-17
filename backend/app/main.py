@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.symbols import router as symbol_router
 from app.api.strategies import router as strategy_router
+from app.api.backtests import router as backtest_router
 
 app = FastAPI(title="多资产模拟平台 API", version="0.1.0")
 
@@ -18,6 +19,7 @@ app.add_middleware(
 
 app.include_router(symbol_router)
 app.include_router(strategy_router)
+app.include_router(backtest_router)
 
 
 @app.get("/health")

@@ -223,3 +223,22 @@ class RunInstance(BaseModel):
     created_at: str
     updated_at: str
     payload: RunInstancePayload
+
+
+class SignalType(str, Enum):
+    OPEN_LONG = "OPEN_LONG"
+    CLOSE_LONG = "CLOSE_LONG"
+    OPEN_SHORT = "OPEN_SHORT"
+    CLOSE_SHORT = "CLOSE_SHORT"
+
+
+class SignalRecord(BaseModel):
+    id: str
+    run_instance_id: str
+    strategy_id: str
+    symbol: str
+    interval: str
+    signal_type: SignalType
+    trigger_time: str
+    trigger_price: float
+    reason_snapshot: str

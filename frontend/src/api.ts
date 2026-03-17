@@ -9,6 +9,7 @@ import type {
   StrategyRecord,
   RunInstance,
   RunInstancePayload,
+  SignalRecord,
   SymbolView,
 } from "./types";
 
@@ -112,4 +113,12 @@ export function changeRunStatus(runId: string, action: "start" | "pause" | "stop
 
 export function deleteRun(runId: string): Promise<{ status: string }> {
   return fetchJson<{ status: string }>(`/api/v1/runs/${runId}`, { method: "DELETE" });
+}
+
+export function tickSignalEngine(): Promise<SignalRecord[]> {
+  return fetchJson<SignalRecord[]>("/api/v1/signal-engine/tick", { method: "POST" });
+}
+
+export function listSignals(): Promise<SignalRecord[]> {
+  return fetchJson<SignalRecord[]>("/api/v1/signal-engine/signals");
 }

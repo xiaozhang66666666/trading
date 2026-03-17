@@ -156,3 +156,15 @@ export interface RunInstance {
   updated_at: string;
   payload: RunInstancePayload;
 }
+
+export interface SignalRecord {
+  id: string;
+  run_instance_id: string;
+  strategy_id: string;
+  symbol: string;
+  interval: string;
+  signal_type: "OPEN_LONG" | "CLOSE_LONG" | "OPEN_SHORT" | "CLOSE_SHORT";
+  trigger_time: string;
+  trigger_price: number;
+  reason_snapshot: string;
+}

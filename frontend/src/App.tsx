@@ -13,11 +13,13 @@ import {
   getHistoryKlines,
   listStrategies,
   listRuns,
+  listSignals,
   getMarketKlines,
   getMarketOverview,
   refreshHistoryKlines,
   runBacktest,
   searchSymbols,
+  tickSignalEngine,
 } from "./api";
 import type {
   BacktestResult,
@@ -28,6 +30,7 @@ import type {
   MarketOverview,
   RunInstance,
   RunInstancePayload,
+  SignalRecord,
   StrategyPayload,
   StrategyRecord,
   StrategyTemplate,
@@ -241,6 +244,8 @@ export default function App() {
     risk_limit: 0.2,
     notify_in_app: true,
   });
+  const [signals, setSignals] = useState<SignalRecord[]>([]);
+  const [signalError, setSignalError] = useState("");
   const [strategyForm, setStrategyForm] = useState<StrategyPayload>({
     name: "策略A",
     template: "MA_CROSS",
@@ -274,6 +279,10 @@ export default function App() {
 
   async function refreshRuns() {
     setRuns(await listRuns());
+  }
+
+  async function refreshSignals() {
+    setSignals(await listSignals());
   }
 
   async function loadHistory(symbol = activeSymbol, interval = activeInterval, force = false) {
@@ -365,6 +374,16 @@ export default function App() {
     await refreshRuns();
   }
 
+  async function triggerSignalTick() {
+    setSignalError("");
+    try {
+      await tickSignalEngine();
+      await refreshSignals();
+    } catch (err: unknown) {
+      setSignalError(err instanceof Error ? err.message : "信号计算失败");
+    }
+  }
+
   async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
     setLoading(true);
     setError("");
@@ -392,6 +411,7 @@ export default function App() {
     void refreshSources();
     void refreshStrategies();
     void refreshRuns();
+    void refreshSignals();
   }, []);
 
   useEffect(() => {
@@ -775,6 +795,32 @@ export default function App() {
                   <button type="button" onClick={() => void removeRunInstance(item.id)}>
                     删除
                   </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="signal-panel">
+          <div className="panel-title-row">
+            <h3>实时信号引擎（T1-07）</h3>
+            <button type="button" onClick={() => void triggerSignalTick()}>
+              手动计算一轮
+            </button>
+          </div>
+          {signalError ? <div className="error">{signalError}</div> : null}
+          <ul className="strategy-list">
+            {signals.map((signal) => (
+              <li key={signal.id}>
+                <div>
+                  <strong>{signal.signal_type}</strong>
+                  <span>
+                    {signal.symbol} {signal.interval}
+                  </span>
+                </div>
+                <div>
+                  <span>{new Date(signal.trigger_time).toLocaleString("zh-CN")}</span>
+                  <span className="up">{formatNumber(signal.trigger_price, 4)}</span>
                 </div>
               </li>
             ))}

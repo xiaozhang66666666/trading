@@ -221,6 +221,66 @@ class BacktestResult(BaseModel):
     equity_curve: list[EquityPoint]
 
 
+class ScanRange(BaseModel):
+    start: float
+    end: float
+    step: float
+
+
+class BacktestScanRequest(BaseModel):
+    strategy_id: str
+    symbol: str
+    interval: str = "15m"
+    initial_capital: float = 100000
+    fee_rate: ScanRange = Field(default_factory=lambda: ScanRange(start=0.0002, end=0.001, step=0.0002))
+    slippage_rate: ScanRange = Field(default_factory=lambda: ScanRange(start=0.0002, end=0.001, step=0.0002))
+    allow_long: bool = True
+    allow_short: bool = True
+    include_extended_hours: bool = False
+    sort_by: str = "total_return"
+    top_n: int = 20
+
+
+class BacktestScanItem(BaseModel):
+    fee_rate: float
+    slippage_rate: float
+    metrics: BacktestMetrics
+
+
+class BacktestScanResult(BaseModel):
+    symbol: str
+    interval: str
+    scanned_count: int
+    sort_by: str
+    items: list[BacktestScanItem]
+
+
+class BacktestCompareRequest(BaseModel):
+    strategy_ids: list[str]
+    symbol: str
+    interval: str = "15m"
+    initial_capital: float = 100000
+    fee_rate: float = 0.0005
+    slippage_rate: float = 0.0005
+    allow_long: bool = True
+    allow_short: bool = True
+    include_extended_hours: bool = False
+    sort_by: str = "total_return"
+
+
+class BacktestCompareItem(BaseModel):
+    strategy_id: str
+    strategy_name: str
+    metrics: BacktestMetrics
+
+
+class BacktestCompareResult(BaseModel):
+    symbol: str
+    interval: str
+    sort_by: str
+    items: list[BacktestCompareItem]
+
+
 class RunStatus(str, Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"

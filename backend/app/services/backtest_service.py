@@ -4,12 +4,19 @@ from dataclasses import dataclass
 from math import sqrt
 
 from app.core.models import (
+    BacktestCompareItem,
+    BacktestCompareRequest,
+    BacktestCompareResult,
     BacktestMetrics,
     BacktestRequest,
     BacktestResult,
+    BacktestScanItem,
+    BacktestScanRequest,
+    BacktestScanResult,
     BacktestTrade,
     EquityPoint,
     Kline,
+    ScanRange,
     StrategyRecord,
     StrategyTemplate,
     Symbol,
@@ -99,6 +106,33 @@ class BacktestService:
         open_short = close_long
         close_short = open_long
         return (open_long, close_long, open_short, close_short)
+
+    @staticmethod
+    def _range_values(scan: ScanRange) -> list[float]:
+        if scan.step <= 0:
+            raise ValueError("参数扫描步长必须大于0")
+        if scan.end < scan.start:
+            raise ValueError("参数扫描结束值不能小于起始值")
+        values: list[float] = []
+        current = scan.start
+        while current <= scan.end + 1e-12:
+            values.append(round(current, 10))
+            current += scan.step
+        return values
+
+    @staticmethod
+    def _metric_value(metrics: BacktestMetrics, key: str) -> float:
+        if key == "max_drawdown":
+            return -metrics.max_drawdown
+        return {
+            "total_return": metrics.total_return,
+            "annual_return": metrics.annual_return,
+            "win_rate": metrics.win_rate,
+            "trade_count": float(metrics.trade_count),
+            "profit_factor": metrics.profit_factor,
+            "profit_loss_ratio": metrics.profit_loss_ratio,
+            "max_drawdown": -metrics.max_drawdown,
+        }.get(key, metrics.total_return)
 
     async def run(self, request: BacktestRequest, symbol: Symbol, strategy: StrategyRecord) -> BacktestResult:
         candles = await self._market_data.get_klines(symbol=symbol, interval=request.interval, limit=500)
@@ -203,3 +237,75 @@ class BacktestService:
             trades=trades,
             equity_curve=equity_curve,
         )
+
+    async def scan(self, request: BacktestScanRequest, symbol: Symbol, strategy: StrategyRecord) -> BacktestScanResult:
+        fee_values = self._range_values(request.fee_rate)
+        slip_values = self._range_values(request.slippage_rate)
+
+        items: list[BacktestScanItem] = []
+        for fee in fee_values:
+            for slip in slip_values:
+                result = await self.run(
+                    BacktestRequest(
+                        strategy_id=request.strategy_id,
+                        symbol=request.symbol,
+                        interval=request.interval,
+                        initial_capital=request.initial_capital,
+                        fee_rate=fee,
+                        slippage_rate=slip,
+                        allow_long=request.allow_long,
+                        allow_short=request.allow_short,
+                        include_extended_hours=request.include_extended_hours,
+                    ),
+                    symbol=symbol,
+                    strategy=strategy,
+                )
+                items.append(
+                    BacktestScanItem(
+                        fee_rate=fee,
+                        slippage_rate=slip,
+                        metrics=result.metrics,
+                    )
+                )
+
+        sorted_items = sorted(
+            items,
+            key=lambda item: self._metric_value(item.metrics, request.sort_by),
+            reverse=True,
+        )
+        top_n = max(1, request.top_n)
+        return BacktestScanResult(
+            symbol=request.symbol,
+            interval=request.interval,
+            scanned_count=len(items),
+            sort_by=request.sort_by,
+            items=sorted_items[:top_n],
+        )
+
+    async def compare(
+        self,
+        request: BacktestCompareRequest,
+        symbol: Symbol,
+        strategies: list[StrategyRecord],
+    ) -> BacktestCompareResult:
+        items: list[BacktestCompareItem] = []
+        for strategy in strategies:
+            result = await self.run(
+                BacktestRequest(
+                    strategy_id=strategy.id,
+                    symbol=request.symbol,
+                    interval=request.interval,
+                    initial_capital=request.initial_capital,
+                    fee_rate=request.fee_rate,
+                    slippage_rate=request.slippage_rate,
+                    allow_long=request.allow_long,
+                    allow_short=request.allow_short,
+                    include_extended_hours=request.include_extended_hours,
+                ),
+                symbol=symbol,
+                strategy=strategy,
+            )
+            items.append(BacktestCompareItem(strategy_id=strategy.id, strategy_name=strategy.name, metrics=result.metrics))
+
+        items.sort(key=lambda item: self._metric_value(item.metrics, request.sort_by), reverse=True)
+        return BacktestCompareResult(symbol=request.symbol, interval=request.interval, sort_by=request.sort_by, items=items)

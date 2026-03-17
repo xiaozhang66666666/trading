@@ -6,6 +6,7 @@ from app.services.data_source_registry import DataSourceRegistry
 from app.services.history_data_service import HistoryDataService
 from app.services.market_data_service import MarketDataService
 from app.services.market_session import MarketSessionService
+from app.services.run_instance_service import RunInstanceService
 from app.services.strategy_service import StrategyService
 from app.services.symbol_service import SymbolService
 from app.services.symbol_view_assembler import SymbolViewAssembler
@@ -50,4 +51,9 @@ def get_strategy_service() -> StrategyService:
 @lru_cache
 def get_backtest_service() -> BacktestService:
     return BacktestService(market_data=get_market_data_service())
+
+
+@lru_cache
+def get_run_instance_service() -> RunInstanceService:
+    return RunInstanceService()
 from app.services.backtest_service import BacktestService

@@ -2,12 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   buildHistoryDownloadUrl,
+  changeRunStatus,
+  copyRun,
+  createRun,
   copyStrategy,
+  deleteRun,
   createStrategy,
   deleteStrategy,
   getDataSources,
   getHistoryKlines,
   listStrategies,
+  listRuns,
   getMarketKlines,
   getMarketOverview,
   refreshHistoryKlines,
@@ -21,6 +26,8 @@ import type {
   HistoryDataset,
   Kline,
   MarketOverview,
+  RunInstance,
+  RunInstancePayload,
   StrategyPayload,
   StrategyRecord,
   StrategyTemplate,
@@ -222,6 +229,18 @@ export default function App() {
   const [backtestError, setBacktestError] = useState("");
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
+  const [runs, setRuns] = useState<RunInstance[]>([]);
+  const [runError, setRunError] = useState("");
+  const [runForm, setRunForm] = useState<RunInstancePayload>({
+    name: "ETH 15m + 策略A",
+    strategy_id: "",
+    symbol: "ETH",
+    interval: "15m",
+    fee_rate: 0.0005,
+    slippage_rate: 0.0005,
+    risk_limit: 0.2,
+    notify_in_app: true,
+  });
   const [strategyForm, setStrategyForm] = useState<StrategyPayload>({
     name: "策略A",
     template: "MA_CROSS",
@@ -246,7 +265,15 @@ export default function App() {
   }
 
   async function refreshStrategies() {
-    setStrategies(await listStrategies());
+    const items = await listStrategies();
+    setStrategies(items);
+    if (items.length > 0) {
+      setRunForm((prev) => ({ ...prev, strategy_id: prev.strategy_id || items[0].id }));
+    }
+  }
+
+  async function refreshRuns() {
+    setRuns(await listRuns());
   }
 
   async function loadHistory(symbol = activeSymbol, interval = activeInterval, force = false) {
@@ -312,6 +339,32 @@ export default function App() {
     }
   }
 
+  async function createRunInstance() {
+    setRunError("");
+    try {
+      const payload = { ...runForm, symbol: activeSymbol, interval: activeInterval };
+      await createRun(payload);
+      await refreshRuns();
+    } catch (err: unknown) {
+      setRunError(err instanceof Error ? err.message : "创建运行实例失败");
+    }
+  }
+
+  async function runAction(runId: string, action: "start" | "pause" | "stop") {
+    await changeRunStatus(runId, action);
+    await refreshRuns();
+  }
+
+  async function copyRunInstance(runId: string) {
+    await copyRun(runId);
+    await refreshRuns();
+  }
+
+  async function removeRunInstance(runId: string) {
+    await deleteRun(runId);
+    await refreshRuns();
+  }
+
   async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
     setLoading(true);
     setError("");
@@ -338,6 +391,7 @@ export default function App() {
     });
     void refreshSources();
     void refreshStrategies();
+    void refreshRuns();
   }, []);
 
   useEffect(() => {
@@ -668,6 +722,63 @@ export default function App() {
               </div>
             </>
           ) : null}
+        </div>
+
+        <div className="run-panel">
+          <div className="panel-title-row">
+            <h3>模拟运行中心（T1-06）</h3>
+            <button type="button" onClick={() => void createRunInstance()}>
+              新建实例
+            </button>
+          </div>
+          <div className="history-meta">
+            <span>实例名称</span>
+            <input
+              value={runForm.name}
+              onChange={(event) => setRunForm((prev) => ({ ...prev, name: event.target.value }))}
+            />
+            <span>策略版本</span>
+            <select
+              value={runForm.strategy_id}
+              onChange={(event) => setRunForm((prev) => ({ ...prev, strategy_id: event.target.value }))}
+            >
+              <option value="">请选择策略</option>
+              {strategies.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} v{item.current_version}
+                </option>
+              ))}
+            </select>
+            <span>标的/周期：{activeSymbol} / {activeInterval}</span>
+          </div>
+          {runError ? <div className="error">{runError}</div> : null}
+          <ul className="strategy-list">
+            {runs.map((item) => (
+              <li key={item.id}>
+                <div>
+                  <strong>{item.payload.name}</strong>
+                  <span>{item.status}</span>
+                </div>
+                <div className="actions">
+                  <button type="button" onClick={() => void runAction(item.id, "start")}>
+                    启动
+                  </button>
+                  <button type="button" onClick={() => void runAction(item.id, "pause")}>
+                    暂停
+                  </button>
+                  <button type="button" onClick={() => void runAction(item.id, "stop")}>
+                    停止
+                  </button>
+                  <button type="button" onClick={() => void copyRunInstance(item.id)}>
+                    复制
+                  </button>
+                  <button type="button" onClick={() => void removeRunInstance(item.id)}>
+                    删除
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </aside>
     </div>

@@ -7,6 +7,8 @@ import type {
   MarketOverview,
   StrategyPayload,
   StrategyRecord,
+  RunInstance,
+  RunInstancePayload,
   SymbolView,
 } from "./types";
 
@@ -85,4 +87,29 @@ export function runBacktest(payload: BacktestRequest): Promise<BacktestResult> {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function listRuns(): Promise<RunInstance[]> {
+  return fetchJson<RunInstance[]>("/api/v1/runs");
+}
+
+export function createRun(payload: RunInstancePayload): Promise<RunInstance> {
+  return fetchJson<RunInstance>("/api/v1/runs", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function copyRun(runId: string): Promise<RunInstance> {
+  return fetchJson<RunInstance>(`/api/v1/runs/${runId}/copy`, {
+    method: "POST",
+  });
+}
+
+export function changeRunStatus(runId: string, action: "start" | "pause" | "stop"): Promise<RunInstance> {
+  return fetchJson<RunInstance>(`/api/v1/runs/${runId}/${action}`, { method: "POST" });
+}
+
+export function deleteRun(runId: string): Promise<{ status: string }> {
+  return fetchJson<{ status: string }>(`/api/v1/runs/${runId}`, { method: "DELETE" });
 }

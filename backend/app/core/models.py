@@ -196,3 +196,30 @@ class BacktestResult(BaseModel):
     metrics: BacktestMetrics
     trades: list[BacktestTrade]
     equity_curve: list[EquityPoint]
+
+
+class RunStatus(str, Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    STOPPED = "STOPPED"
+    ERROR = "ERROR"
+
+
+class RunInstancePayload(BaseModel):
+    name: str
+    strategy_id: str
+    symbol: str
+    interval: str
+    fee_rate: float
+    slippage_rate: float
+    risk_limit: float
+    notify_in_app: bool = True
+
+
+class RunInstance(BaseModel):
+    id: str
+    status: RunStatus
+    created_at: str
+    updated_at: str
+    payload: RunInstancePayload

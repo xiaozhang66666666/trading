@@ -135,3 +135,24 @@ export interface BacktestResult {
   trades: BacktestTrade[];
   equity_curve: EquityPoint[];
 }
+
+export type RunStatus = "PENDING" | "RUNNING" | "PAUSED" | "STOPPED" | "ERROR";
+
+export interface RunInstancePayload {
+  name: string;
+  strategy_id: string;
+  symbol: string;
+  interval: string;
+  fee_rate: number;
+  slippage_rate: number;
+  risk_limit: number;
+  notify_in_app: boolean;
+}
+
+export interface RunInstance {
+  id: string;
+  status: RunStatus;
+  created_at: string;
+  updated_at: string;
+  payload: RunInstancePayload;
+}

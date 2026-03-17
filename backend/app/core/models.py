@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MarketType(str, Enum):
@@ -108,6 +108,29 @@ class HistoryDataset(BaseModel):
     missing_points: int
     has_missing: bool
     candles: list[Kline]
+
+
+class SessionIntegrity(BaseModel):
+    pre_market_ratio: float = 0.0
+    regular_ratio: float = 0.0
+    after_hours_ratio: float = 0.0
+    checked_trading_day: str = ""
+    issues: list[str] = Field(default_factory=list)
+
+
+class KlineQualityReport(BaseModel):
+    symbol: str
+    interval: str
+    total_points: int
+    duplicate_points: int
+    out_of_order_points: int
+    missing_points: int
+    filled_points: int
+    invalid_price_points: int
+    session_integrity: SessionIntegrity
+    score: float
+    level: str
+    issues: list[str] = Field(default_factory=list)
 
 
 class StrategyTemplate(str, Enum):

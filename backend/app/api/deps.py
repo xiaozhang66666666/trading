@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from app.services.backtest_service import BacktestService
 from app.services.data_source_registry import DataSourceRegistry
 from app.services.history_data_service import HistoryDataService
 from app.services.market_data_service import MarketDataService
@@ -19,8 +20,13 @@ from app.services.watchlist_service import WatchlistService
 
 
 @lru_cache
+def get_system_settings_service() -> SystemSettingsService:
+    return SystemSettingsService()
+
+
+@lru_cache
 def get_registry() -> DataSourceRegistry:
-    return DataSourceRegistry()
+    return DataSourceRegistry(settings_getter=get_system_settings_service().get)
 
 
 @lru_cache
@@ -79,11 +85,5 @@ def get_trade_ledger_service() -> TradeLedgerService:
 
 
 @lru_cache
-def get_system_settings_service() -> SystemSettingsService:
-    return SystemSettingsService()
-
-
-@lru_cache
 def get_system_health_service() -> SystemHealthService:
     return SystemHealthService(symbol_service=get_symbol_service(), run_service=get_run_instance_service())
-from app.services.backtest_service import BacktestService

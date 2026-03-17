@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
-from app.core.models import DataSnapshot, DataState, Kline, MarketQuote
+from app.core.models import DataSnapshot, DataState, Kline, MarketQuote, SystemSettings
 from app.services.data_sources.base import BaseDataSource
 
 
@@ -20,6 +21,10 @@ class _AlpacaProvider:
     @property
     def configured(self) -> bool:
         return bool(self._key and self._secret)
+
+    @property
+    def provider_key(self) -> str:
+        return "alpaca"
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -74,6 +79,7 @@ class _AlpacaProvider:
             "1d": "1Day",
         }
         timeframe = timeframe_map.get(interval, "15Min")
+        interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440}.get(interval, 15)
         async with httpx.AsyncClient(timeout=6.0) as client:
             response = await client.get(
                 f"{self._BASE_URL}/stocks/{symbol}/bars",
@@ -86,7 +92,9 @@ class _AlpacaProvider:
         candles: list[Kline] = []
         for item in bars:
             open_time = item.get("t")
-            close_time = datetime.fromisoformat(open_time.replace("Z", "+00:00")) + timedelta(minutes=1)
+            if not open_time:
+                continue
+            close_time = datetime.fromisoformat(open_time.replace("Z", "+00:00")) + timedelta(minutes=interval_minutes)
             candles.append(
                 Kline(
                     open_time=open_time,
@@ -110,6 +118,10 @@ class _TwelveDataProvider:
     @property
     def configured(self) -> bool:
         return bool(self._key)
+
+    @property
+    def provider_key(self) -> str:
+        return "twelve_data"
 
     async def quote(self, symbol: str) -> MarketQuote | None:
         if not self.configured:
@@ -154,6 +166,7 @@ class _TwelveDataProvider:
             "1d": "1day",
         }
         mapped = interval_map.get(interval, "15min")
+        interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440}.get(interval, 15)
         async with httpx.AsyncClient(timeout=6.0) as client:
             response = await client.get(
                 f"{self._BASE_URL}/time_series",
@@ -176,7 +189,7 @@ class _TwelveDataProvider:
             candles.append(
                 Kline(
                     open_time=start.isoformat(),
-                    close_time=(start + timedelta(minutes=1)).isoformat(),
+                    close_time=(start + timedelta(minutes=interval_minutes)).isoformat(),
                     open=float(row["open"]),
                     high=float(row["high"]),
                     low=float(row["low"]),
@@ -188,13 +201,54 @@ class _TwelveDataProvider:
 
 
 class UsEquityRealtimePlaceholderDataSource(BaseDataSource):
-    """美股 provider 适配层：优先 Alpaca，失败回退 Twelve Data。"""
+    """美股 provider 适配层：支持主备切换、自动重试与占位兜底。"""
 
     name = "us_equity_realtime"
 
-    def __init__(self) -> None:
+    def __init__(self, settings_getter: Callable[[], SystemSettings] | None = None) -> None:
         self._alpaca = _AlpacaProvider()
         self._twelve = _TwelveDataProvider()
+        self._settings_getter = settings_getter
+        self._providers = {
+            self._alpaca.provider_key: self._alpaca,
+            self._twelve.provider_key: self._twelve,
+        }
+        self._last_active_provider = ""
+
+    @staticmethod
+    def _safe_text(exc: Exception) -> str:
+        return str(exc).replace("\n", " ")
+
+    def _settings(self) -> SystemSettings:
+        if self._settings_getter is None:
+            return SystemSettings()
+        return self._settings_getter()
+
+    def _resolve_provider_order(self) -> list[Any]:
+        settings = self._settings()
+        preferred = settings.preferred_us_provider.strip().lower()
+        fallback = settings.fallback_us_provider.strip().lower()
+
+        order: list[Any] = []
+        for provider_key in [preferred, fallback, "alpaca", "twelve_data"]:
+            provider = self._providers.get(provider_key)
+            if provider and provider not in order:
+                order.append(provider)
+        return order
+
+    async def _with_retry(self, call: Callable[[], Any], max_attempts: int = 3, base_sleep: float = 0.25) -> Any:
+        last_error: Exception | None = None
+        for attempt in range(max_attempts):
+            try:
+                return await call()
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                if attempt == max_attempts - 1:
+                    break
+                await asyncio.sleep(base_sleep * (2**attempt))
+        if last_error:
+            raise last_error
+        raise RuntimeError("未知重试异常")
 
     def _fallback_quote(self, symbol: str, reason: str) -> MarketQuote:
         now = datetime.now(tz=timezone.utc)
@@ -213,12 +267,13 @@ class UsEquityRealtimePlaceholderDataSource(BaseDataSource):
             detail=f"美股数据源不可用，当前为占位行情：{reason}",
         )
 
-    def _fallback_klines(self, symbol: str, limit: int) -> list[Kline]:
+    def _fallback_klines(self, symbol: str, limit: int, interval: str) -> list[Kline]:
         now = datetime.now(tz=timezone.utc)
         seed = float(100 + (sum(ord(ch) for ch in symbol) % 100))
+        interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440}.get(interval, 15)
         candles: list[Kline] = []
         for i in range(limit):
-            open_time = now - timedelta(minutes=limit - i)
+            open_time = now - timedelta(minutes=interval_minutes * (limit - i))
             wave = ((i % 8) - 4) * 0.15
             open_price = seed + wave
             close_price = open_price + ((i % 3) - 1) * 0.08
@@ -227,7 +282,7 @@ class UsEquityRealtimePlaceholderDataSource(BaseDataSource):
             candles.append(
                 Kline(
                     open_time=open_time.isoformat(),
-                    close_time=(open_time + timedelta(minutes=1)).isoformat(),
+                    close_time=(open_time + timedelta(minutes=interval_minutes)).isoformat(),
                     open=round(open_price, 4),
                     high=round(high, 4),
                     low=round(low, 4),
@@ -237,25 +292,19 @@ class UsEquityRealtimePlaceholderDataSource(BaseDataSource):
             )
         return candles
 
-    @staticmethod
-    def _safe_text(exc: Exception) -> str:
-        return str(exc).replace("\n", " ")
-
     async def fetch_snapshot(self, symbol: str) -> DataSnapshot:
         quote = await self.fetch_quote(symbol)
         return DataSnapshot(state=quote.state, detail=quote.detail, last_price=quote.last)
 
     async def health_check(self) -> DataSnapshot:
-        if self._alpaca.configured:
+        order = self._resolve_provider_order()
+        configured: list[str] = [provider.provider_key for provider in order if provider.configured]
+        if configured:
+            provider_name = self._last_active_provider or configured[0]
+            state = DataState.REALTIME if provider_name == "alpaca" else DataState.DELAYED
             return DataSnapshot(
-                state=DataState.REALTIME,
-                detail="美股通道：Alpaca 已配置（IEX feed）",
-                last_price=None,
-            )
-        if self._twelve.configured:
-            return DataSnapshot(
-                state=DataState.DELAYED,
-                detail="美股通道：Alpaca 未配置，回退 Twelve Data",
+                state=state,
+                detail=f"美股通道在线，当前主通道 {provider_name}，可用通道: {', '.join(configured)}",
                 last_price=None,
             )
         return DataSnapshot(
@@ -266,42 +315,33 @@ class UsEquityRealtimePlaceholderDataSource(BaseDataSource):
 
     async def fetch_quote(self, symbol: str) -> MarketQuote:
         errors: list[str] = []
-        if self._alpaca.configured:
+        for provider in self._resolve_provider_order():
+            if not provider.configured:
+                continue
             try:
-                quote = await self._alpaca.quote(symbol)
+                quote = await self._with_retry(lambda: provider.quote(symbol))
                 if quote:
+                    self._last_active_provider = provider.provider_key
                     return quote
             except Exception as exc:  # noqa: BLE001
-                errors.append(f"Alpaca: {self._safe_text(exc)}")
-
-        if self._twelve.configured:
-            try:
-                quote = await self._twelve.quote(symbol)
-                if quote:
-                    return quote
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"TwelveData: {self._safe_text(exc)}")
+                errors.append(f"{provider.provider_key}: {self._safe_text(exc)}")
 
         reason = "；".join(errors) if errors else "未配置可用 provider"
         return self._fallback_quote(symbol, reason)
 
     async def fetch_klines(self, symbol: str, interval: str, limit: int = 200) -> list[Kline]:
         errors: list[str] = []
-        if self._alpaca.configured:
+        for provider in self._resolve_provider_order():
+            if not provider.configured:
+                continue
             try:
-                bars = await self._alpaca.klines(symbol, interval, limit)
+                bars = await self._with_retry(lambda: provider.klines(symbol, interval, limit))
                 if bars:
+                    self._last_active_provider = provider.provider_key
                     return bars
             except Exception as exc:  # noqa: BLE001
-                errors.append(f"Alpaca: {self._safe_text(exc)}")
-
-        if self._twelve.configured:
-            try:
-                bars = await self._twelve.klines(symbol, interval, limit)
-                if bars:
-                    return bars
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"TwelveData: {self._safe_text(exc)}")
+                errors.append(f"{provider.provider_key}: {self._safe_text(exc)}")
 
         # provider 失败时仍返回占位 K 线，确保页面可加载并显式显示断连态。
-        return self._fallback_klines(symbol, min(max(limit, 30), 300))
+        fallback_limit = min(max(limit, 30), 300)
+        return self._fallback_klines(symbol, fallback_limit, interval)

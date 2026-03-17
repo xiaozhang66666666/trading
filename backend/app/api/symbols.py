@@ -10,7 +10,7 @@ from app.api.deps import (
     get_symbol_view_assembler,
     get_watchlist_service,
 )
-from app.core.models import HistoryDataset, Kline, MarketOverview, SymbolView, WatchlistAction
+from app.core.models import HistoryDataset, Kline, KlineQualityReport, MarketOverview, SymbolView, WatchlistAction
 from app.services.history_data_service import HistoryDataService
 from app.services.market_data_service import MarketDataService
 from app.services.symbol_service import SymbolService
@@ -101,6 +101,20 @@ async def get_market_klines(
     if not symbol_info:
         raise HTTPException(status_code=404, detail="标的不存在")
     return await market_data.get_klines(symbol_info, interval=interval, limit=limit)
+
+
+@router.get("/market/quality", response_model=KlineQualityReport)
+async def get_market_quality(
+    symbol: str,
+    interval: str = Query(default="15m", pattern="^(1m|5m|15m|1h|4h|1d)$"),
+    limit: int = Query(default=200, ge=30, le=500),
+    symbol_service: SymbolService = Depends(get_symbol_service),
+    market_data: MarketDataService = Depends(get_market_data_service),
+) -> KlineQualityReport:
+    symbol_info = symbol_service.get_symbol(symbol)
+    if not symbol_info:
+        raise HTTPException(status_code=404, detail="标的不存在")
+    return await market_data.get_kline_quality(symbol_info, interval=interval, limit=limit)
 
 
 @router.get("/history/klines", response_model=HistoryDataset)

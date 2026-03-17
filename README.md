@@ -14,6 +14,7 @@
 ## 核心文档
 - 产品概述：`docs/PRODUCT_OVERVIEW.md`
 - 功能文档：`docs/FUNCTIONAL_SPEC.md`
+- 数据源方案：`docs/DATA_SOURCE_PLAN.md`
 
 ## 当前里程碑
 - [ ] T1-01 标的管理与数据源接入

@@ -16,4 +16,11 @@ npm run dev
 ```
 
 可选环境变量：
-- `VITE_API_BASE`，默认 `http://127.0.0.1:8000`
+- `VITE_API_BASE`，默认 `/api`
+- `VITE_BACKEND_TARGET`，仅本地 dev 代理使用，默认 `http://127.0.0.1:8000`
+
+## Docker
+```bash
+docker build -t multi-asset-frontend ./frontend
+docker run --rm -p 8080:80 multi-asset-frontend
+```

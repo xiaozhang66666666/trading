@@ -16,6 +16,12 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
+## Docker
+```bash
+docker build -t multi-asset-backend ./backend
+docker run --rm -p 8000:8000 multi-asset-backend
+```
+
 ## 关键接口
 - `GET /api/v1/symbols/search?q=QQQ`
 - `GET /api/v1/watchlist`

@@ -13,8 +13,20 @@
 
 ## 核心文档
 - 产品概述：`docs/PRODUCT_OVERVIEW.md`
+- 产品需求（PRD）：`docs/PRODUCT_REQUIREMENTS.md`
 - 功能文档：`docs/FUNCTIONAL_SPEC.md`
 - 数据源方案：`docs/DATA_SOURCE_PLAN.md`
+- 部署文档：`docs/DEPLOYMENT.md`
+
+## 快速部署（Docker Compose）
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+访问：
+- 前端：`http://127.0.0.1:8080`
+- 后端健康检查：`http://127.0.0.1:8000/health`
 
 ## 当前里程碑
 - [ ] T1-01 标的管理与数据源接入

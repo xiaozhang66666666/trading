@@ -108,3 +108,45 @@ class HistoryDataset(BaseModel):
     missing_points: int
     has_missing: bool
     candles: list[Kline]
+
+
+class StrategyTemplate(str, Enum):
+    MA_CROSS = "MA_CROSS"
+    RSI_REVERSAL = "RSI_REVERSAL"
+    MACD_TREND = "MACD_TREND"
+    BOLL_BREAKOUT = "BOLL_BREAKOUT"
+    RANGE_BREAKOUT = "RANGE_BREAKOUT"
+
+
+class StrategyDirectionConfig(BaseModel):
+    allow_long: bool = True
+    allow_short: bool = True
+    include_extended_hours: bool = False
+
+
+class StrategyPayload(BaseModel):
+    name: str
+    template: StrategyTemplate
+    interval: str
+    open_condition: str
+    close_condition: str
+    take_profit: float
+    stop_loss: float
+    position_size: float
+    direction: StrategyDirectionConfig
+    json_dsl: str
+
+
+class StrategyVersion(BaseModel):
+    version: int
+    created_at: str
+    payload: StrategyPayload
+
+
+class StrategyRecord(BaseModel):
+    id: str
+    name: str
+    current_version: int
+    updated_at: str
+    latest_payload: StrategyPayload
+    versions: list[StrategyVersion]

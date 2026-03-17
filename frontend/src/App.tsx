@@ -2,14 +2,28 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   buildHistoryDownloadUrl,
+  copyStrategy,
+  createStrategy,
+  deleteStrategy,
   getDataSources,
   getHistoryKlines,
+  listStrategies,
   getMarketKlines,
   getMarketOverview,
   refreshHistoryKlines,
   searchSymbols,
 } from "./api";
-import type { DataSourceStatus, DataState, HistoryDataset, Kline, MarketOverview, SymbolView } from "./types";
+import type {
+  DataSourceStatus,
+  DataState,
+  HistoryDataset,
+  Kline,
+  MarketOverview,
+  StrategyPayload,
+  StrategyRecord,
+  StrategyTemplate,
+  SymbolView,
+} from "./types";
 
 const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 
@@ -26,6 +40,21 @@ const marketText = {
 };
 
 type IndicatorKey = "MA" | "EMA" | "RSI" | "MACD" | "BOLL";
+
+const defaultDsl = JSON.stringify(
+  {
+    strategy: { name: "模板策略", version: "1.0.0" },
+    indicators: [{ name: "ma", params: { short: 5, long: 20 } }],
+    conditions: { logic: "AND" },
+    entry_long: { when: "ma_short_cross_over_ma_long" },
+    exit_long: { when: "ma_short_cross_below_ma_long" },
+    entry_short: { when: "ma_short_cross_below_ma_long" },
+    exit_short: { when: "ma_short_cross_over_ma_long" },
+    risk: { take_profit: 3, stop_loss: 1.2, cooldown_bars: 2, notifications: { in_app: true } },
+  },
+  null,
+  2,
+);
 
 function formatNumber(value: number, fraction = 2): string {
   return Number.isFinite(value) ? value.toLocaleString("zh-CN", { maximumFractionDigits: fraction }) : "-";
@@ -185,6 +214,21 @@ export default function App() {
   const [history, setHistory] = useState<HistoryDataset | null>(null);
   const [historyError, setHistoryError] = useState("");
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [strategies, setStrategies] = useState<StrategyRecord[]>([]);
+  const [strategyError, setStrategyError] = useState("");
+  const [strategySaving, setStrategySaving] = useState(false);
+  const [strategyForm, setStrategyForm] = useState<StrategyPayload>({
+    name: "策略A",
+    template: "MA_CROSS",
+    interval: "15m",
+    open_condition: "MA5 上穿 MA20",
+    close_condition: "MA5 下穿 MA20",
+    take_profit: 3,
+    stop_loss: 1.2,
+    position_size: 0.3,
+    direction: { allow_long: true, allow_short: true, include_extended_hours: false },
+    json_dsl: defaultDsl,
+  });
 
   const filteredSymbols = useMemo(() => {
     const key = keyword.trim().toLowerCase();
@@ -194,6 +238,10 @@ export default function App() {
 
   async function refreshSources() {
     setSources(await getDataSources());
+  }
+
+  async function refreshStrategies() {
+    setStrategies(await listStrategies());
   }
 
   async function loadHistory(symbol = activeSymbol, interval = activeInterval, force = false) {
@@ -207,6 +255,29 @@ export default function App() {
     } finally {
       setHistoryLoading(false);
     }
+  }
+
+  async function submitStrategy() {
+    setStrategySaving(true);
+    setStrategyError("");
+    try {
+      await createStrategy(strategyForm);
+      await refreshStrategies();
+    } catch (err: unknown) {
+      setStrategyError(err instanceof Error ? err.message : "策略保存失败");
+    } finally {
+      setStrategySaving(false);
+    }
+  }
+
+  async function onCopyStrategy(strategyId: string) {
+    await copyStrategy(strategyId);
+    await refreshStrategies();
+  }
+
+  async function onDeleteStrategy(strategyId: string) {
+    await deleteStrategy(strategyId);
+    await refreshStrategies();
   }
 
   async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
@@ -234,6 +305,7 @@ export default function App() {
       }
     });
     void refreshSources();
+    void refreshStrategies();
   }, []);
 
   useEffect(() => {
@@ -407,6 +479,109 @@ export default function App() {
           </div>
           {historyLoading ? <div className="hint">历史数据刷新中...</div> : null}
           {historyError ? <div className="error">{historyError}</div> : null}
+        </div>
+
+        <div className="strategy-panel">
+          <div className="panel-title-row">
+            <h3>策略中心（T1-04）</h3>
+            <button type="button" onClick={() => void submitStrategy()} disabled={strategySaving}>
+              {strategySaving ? "保存中..." : "保存策略"}
+            </button>
+          </div>
+          <div className="strategy-form">
+            <input
+              value={strategyForm.name}
+              onChange={(event) => setStrategyForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="策略名称"
+            />
+            <select
+              value={strategyForm.template}
+              onChange={(event) =>
+                setStrategyForm((prev) => ({ ...prev, template: event.target.value as StrategyTemplate }))
+              }
+            >
+              <option value="MA_CROSS">MA 均线交叉</option>
+              <option value="RSI_REVERSAL">RSI 超买超卖</option>
+              <option value="MACD_TREND">MACD 趋势</option>
+              <option value="BOLL_BREAKOUT">布林带突破/回归</option>
+              <option value="RANGE_BREAKOUT">区间突破</option>
+            </select>
+            <div className="inline-fields">
+              <label>
+                止盈
+                <input
+                  type="number"
+                  step="0.1"
+                  value={strategyForm.take_profit}
+                  onChange={(event) =>
+                    setStrategyForm((prev) => ({ ...prev, take_profit: Number(event.target.value) }))
+                  }
+                />
+              </label>
+              <label>
+                止损
+                <input
+                  type="number"
+                  step="0.1"
+                  value={strategyForm.stop_loss}
+                  onChange={(event) => setStrategyForm((prev) => ({ ...prev, stop_loss: Number(event.target.value) }))}
+                />
+              </label>
+            </div>
+            <div className="inline-fields">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={strategyForm.direction.allow_long}
+                  onChange={(event) =>
+                    setStrategyForm((prev) => ({
+                      ...prev,
+                      direction: { ...prev.direction, allow_long: event.target.checked },
+                    }))
+                  }
+                />
+                允许做多
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={strategyForm.direction.allow_short}
+                  onChange={(event) =>
+                    setStrategyForm((prev) => ({
+                      ...prev,
+                      direction: { ...prev.direction, allow_short: event.target.checked },
+                    }))
+                  }
+                />
+                允许做空
+              </label>
+            </div>
+            <textarea
+              value={strategyForm.json_dsl}
+              onChange={(event) => setStrategyForm((prev) => ({ ...prev, json_dsl: event.target.value }))}
+              rows={8}
+            />
+          </div>
+          {strategyError ? <div className="error">{strategyError}</div> : null}
+
+          <ul className="strategy-list">
+            {strategies.map((item) => (
+              <li key={item.id}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <span>v{item.current_version}</span>
+                </div>
+                <div className="actions">
+                  <button type="button" onClick={() => void onCopyStrategy(item.id)}>
+                    复制
+                  </button>
+                  <button type="button" onClick={() => void onDeleteStrategy(item.id)}>
+                    删除
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </aside>
     </div>

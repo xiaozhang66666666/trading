@@ -6,6 +6,7 @@ from app.services.data_source_registry import DataSourceRegistry
 from app.services.history_data_service import HistoryDataService
 from app.services.market_data_service import MarketDataService
 from app.services.market_session import MarketSessionService
+from app.services.strategy_service import StrategyService
 from app.services.symbol_service import SymbolService
 from app.services.symbol_view_assembler import SymbolViewAssembler
 from app.services.watchlist_service import WatchlistService
@@ -39,3 +40,8 @@ def get_market_data_service() -> MarketDataService:
 @lru_cache
 def get_history_data_service() -> HistoryDataService:
     return HistoryDataService(market_data=get_market_data_service())
+
+
+@lru_cache
+def get_strategy_service() -> StrategyService:
+    return StrategyService()

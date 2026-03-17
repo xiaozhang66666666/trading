@@ -59,3 +59,35 @@ export interface HistoryDataset {
   has_missing: boolean;
   candles: Kline[];
 }
+
+export type StrategyTemplate =
+  | "MA_CROSS"
+  | "RSI_REVERSAL"
+  | "MACD_TREND"
+  | "BOLL_BREAKOUT"
+  | "RANGE_BREAKOUT";
+
+export interface StrategyPayload {
+  name: string;
+  template: StrategyTemplate;
+  interval: string;
+  open_condition: string;
+  close_condition: string;
+  take_profit: number;
+  stop_loss: number;
+  position_size: number;
+  direction: {
+    allow_long: boolean;
+    allow_short: boolean;
+    include_extended_hours: boolean;
+  };
+  json_dsl: string;
+}
+
+export interface StrategyRecord {
+  id: string;
+  name: string;
+  current_version: number;
+  updated_at: string;
+  latest_payload: StrategyPayload;
+}

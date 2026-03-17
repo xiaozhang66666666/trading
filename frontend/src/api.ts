@@ -1,4 +1,12 @@
-import type { DataSourceStatus, HistoryDataset, Kline, MarketOverview, SymbolView } from "./types";
+import type {
+  DataSourceStatus,
+  HistoryDataset,
+  Kline,
+  MarketOverview,
+  StrategyPayload,
+  StrategyRecord,
+  SymbolView,
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
@@ -45,4 +53,27 @@ export function refreshHistoryKlines(symbol: string, interval: string): Promise<
 export function buildHistoryDownloadUrl(symbol: string, interval: string, format: "csv" | "parquet"): string {
   const query = new URLSearchParams({ symbol, interval, limit: "500" });
   return `${API_BASE}/api/v1/history/download.${format}?${query.toString()}`;
+}
+
+export function listStrategies(): Promise<StrategyRecord[]> {
+  return fetchJson<StrategyRecord[]>("/api/v1/strategies");
+}
+
+export function createStrategy(payload: StrategyPayload): Promise<StrategyRecord> {
+  return fetchJson<StrategyRecord>("/api/v1/strategies", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function copyStrategy(strategyId: string): Promise<StrategyRecord> {
+  return fetchJson<StrategyRecord>(`/api/v1/strategies/${strategyId}/copy`, {
+    method: "POST",
+  });
+}
+
+export function deleteStrategy(strategyId: string): Promise<{ status: string }> {
+  return fetchJson<{ status: string }>(`/api/v1/strategies/${strategyId}`, {
+    method: "DELETE",
+  });
 }

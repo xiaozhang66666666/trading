@@ -8,6 +8,7 @@ from app.api.strategies import router as strategy_router
 from app.api.backtests import router as backtest_router
 from app.api.runs import router as run_router
 from app.api.signal_engine import router as signal_engine_router
+from app.api.notifications import router as notification_router
 
 app = FastAPI(title="多资产模拟平台 API", version="0.1.0")
 
@@ -24,6 +25,7 @@ app.include_router(strategy_router)
 app.include_router(backtest_router)
 app.include_router(run_router)
 app.include_router(signal_engine_router)
+app.include_router(notification_router)
 
 
 @app.get("/health")

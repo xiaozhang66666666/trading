@@ -9,6 +9,7 @@ import type {
   StrategyRecord,
   RunInstance,
   RunInstancePayload,
+  NotificationRecord,
   SignalRecord,
   SymbolView,
 } from "./types";
@@ -121,4 +122,21 @@ export function tickSignalEngine(): Promise<SignalRecord[]> {
 
 export function listSignals(): Promise<SignalRecord[]> {
   return fetchJson<SignalRecord[]>("/api/v1/signal-engine/signals");
+}
+
+export function listNotifications(): Promise<NotificationRecord[]> {
+  return fetchJson<NotificationRecord[]>("/api/v1/notifications");
+}
+
+export function markNotificationsRead(ids: string[]): Promise<{ status: string }> {
+  return fetchJson<{ status: string }>("/api/v1/notifications/mark-read", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export function checkDatasourceNotifications(): Promise<{ created: number }> {
+  return fetchJson<{ created: number }>("/api/v1/notifications/check-datasource", {
+    method: "POST",
+  });
 }

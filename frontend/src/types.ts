@@ -168,3 +168,12 @@ export interface SignalRecord {
   trigger_price: number;
   reason_snapshot: string;
 }
+
+export interface NotificationRecord {
+  id: string;
+  type: "SIGNAL" | "SYSTEM" | "DATASOURCE";
+  title: string;
+  content: string;
+  created_at: string;
+  read: boolean;
+}

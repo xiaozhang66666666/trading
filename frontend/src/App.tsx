@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   buildHistoryDownloadUrl,
+  checkDatasourceNotifications,
   changeRunStatus,
   copyRun,
   createRun,
@@ -13,7 +14,9 @@ import {
   getHistoryKlines,
   listStrategies,
   listRuns,
+  listNotifications,
   listSignals,
+  markNotificationsRead,
   getMarketKlines,
   getMarketOverview,
   refreshHistoryKlines,
@@ -28,6 +31,7 @@ import type {
   HistoryDataset,
   Kline,
   MarketOverview,
+  NotificationRecord,
   RunInstance,
   RunInstancePayload,
   SignalRecord,
@@ -246,6 +250,7 @@ export default function App() {
   });
   const [signals, setSignals] = useState<SignalRecord[]>([]);
   const [signalError, setSignalError] = useState("");
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [strategyForm, setStrategyForm] = useState<StrategyPayload>({
     name: "策略A",
     template: "MA_CROSS",
@@ -283,6 +288,10 @@ export default function App() {
 
   async function refreshSignals() {
     setSignals(await listSignals());
+  }
+
+  async function refreshNotifications() {
+    setNotifications(await listNotifications());
   }
 
   async function loadHistory(symbol = activeSymbol, interval = activeInterval, force = false) {
@@ -379,9 +388,21 @@ export default function App() {
     try {
       await tickSignalEngine();
       await refreshSignals();
+      await refreshNotifications();
     } catch (err: unknown) {
       setSignalError(err instanceof Error ? err.message : "信号计算失败");
     }
+  }
+
+  async function markAllNotificationsRead() {
+    if (notifications.length === 0) return;
+    await markNotificationsRead(notifications.filter((item) => !item.read).map((item) => item.id));
+    await refreshNotifications();
+  }
+
+  async function checkDatasourceAlerts() {
+    await checkDatasourceNotifications();
+    await refreshNotifications();
   }
 
   async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
@@ -412,6 +433,7 @@ export default function App() {
     void refreshStrategies();
     void refreshRuns();
     void refreshSignals();
+    void refreshNotifications();
   }, []);
 
   useEffect(() => {
@@ -822,6 +844,35 @@ export default function App() {
                   <span>{new Date(signal.trigger_time).toLocaleString("zh-CN")}</span>
                   <span className="up">{formatNumber(signal.trigger_price, 4)}</span>
                 </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="notification-panel">
+          <div className="panel-title-row">
+            <h3>站内信通知（T1-08）</h3>
+            <div className="actions">
+              <button type="button" onClick={() => void checkDatasourceAlerts()}>
+                检查数据源异常
+              </button>
+              <button type="button" onClick={() => void markAllNotificationsRead()}>
+                全部标已读
+              </button>
+            </div>
+          </div>
+          <ul className="strategy-list">
+            {notifications.map((note) => (
+              <li key={note.id} className={note.read ? "" : "unread-item"}>
+                <div>
+                  <strong>{note.title}</strong>
+                  <span>{note.type}</span>
+                </div>
+                <div>
+                  <span>{new Date(note.created_at).toLocaleString("zh-CN")}</span>
+                  <span>{note.read ? "已读" : "未读"}</span>
+                </div>
+                <p>{note.content}</p>
               </li>
             ))}
           </ul>

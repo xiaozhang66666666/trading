@@ -6,6 +6,7 @@ from app.services.data_source_registry import DataSourceRegistry
 from app.services.history_data_service import HistoryDataService
 from app.services.market_data_service import MarketDataService
 from app.services.market_session import MarketSessionService
+from app.services.notification_service import NotificationService
 from app.services.run_instance_service import RunInstanceService
 from app.services.signal_engine_service import SignalEngineService
 from app.services.strategy_service import StrategyService
@@ -62,4 +63,9 @@ def get_run_instance_service() -> RunInstanceService:
 @lru_cache
 def get_signal_engine_service() -> SignalEngineService:
     return SignalEngineService(market_data=get_market_data_service())
+
+
+@lru_cache
+def get_notification_service() -> NotificationService:
+    return NotificationService()
 from app.services.backtest_service import BacktestService

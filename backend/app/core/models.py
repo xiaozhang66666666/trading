@@ -242,3 +242,22 @@ class SignalRecord(BaseModel):
     trigger_time: str
     trigger_price: float
     reason_snapshot: str
+
+
+class NotificationType(str, Enum):
+    SIGNAL = "SIGNAL"
+    SYSTEM = "SYSTEM"
+    DATASOURCE = "DATASOURCE"
+
+
+class NotificationRecord(BaseModel):
+    id: str
+    type: NotificationType
+    title: str
+    content: str
+    created_at: str
+    read: bool = False
+
+
+class MarkReadPayload(BaseModel):
+    ids: list[str]

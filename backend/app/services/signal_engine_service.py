@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.core.models import (
     RunInstance,
@@ -19,6 +20,8 @@ from app.services.market_data_service import MarketDataService
 @dataclass
 class _EngineState:
     position: str = "FLAT"
+    last_signal_time: str = ""
+    last_open_time: str = ""
 
 
 class SignalEngineService:
@@ -78,6 +81,31 @@ class SignalEngineService:
         return (open_long, close_long, open_short, close_short)
 
     @staticmethod
+    def _parse_iso(value: str) -> datetime:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+    def _can_emit_signal(self, run: RunInstance, state: _EngineState, latest_close_time: str) -> bool:
+        if not state.last_signal_time:
+            return True
+        elapsed = (self._parse_iso(latest_close_time) - self._parse_iso(state.last_signal_time)).total_seconds()
+        return elapsed >= max(run.payload.min_signal_interval_seconds, 0)
+
+    def _cooldown_ready(self, run: RunInstance, state: _EngineState, latest_close_time: str) -> bool:
+        if not state.last_open_time:
+            return True
+        elapsed = (self._parse_iso(latest_close_time) - self._parse_iso(state.last_open_time)).total_seconds()
+        return elapsed >= max(run.payload.cooldown_seconds, 0)
+
+    @staticmethod
+    def _risk_allows(run: RunInstance, latest_price: float, latest_open: float, latest_high: float, latest_low: float) -> bool:
+        if latest_price > run.payload.max_position_value:
+            return False
+        if latest_open <= 0:
+            return False
+        volatility = (latest_high - latest_low) / latest_open
+        return volatility <= max(run.payload.risk_limit, 0)
+
+    @staticmethod
     def _make_reason(strategy: StrategyRecord, signal_type: SignalType) -> str:
         return json.dumps(
             {
@@ -108,17 +136,36 @@ class SignalEngineService:
 
             state = self._states.setdefault(run.id, _EngineState())
             signal_type: SignalType | None = None
+            if run.payload.require_volume and latest.volume <= 0:
+                continue
+            if not self._can_emit_signal(run, state, latest.close_time):
+                continue
+
             if state.position == "FLAT":
+                if not self._cooldown_ready(run, state, latest.close_time):
+                    continue
                 if strategy.latest_payload.direction.allow_long and open_long:
+                    if not self._risk_allows(run, latest.close, latest.open, latest.high, latest.low):
+                        continue
                     signal_type = SignalType.OPEN_LONG
                     state.position = "LONG"
+                    state.last_open_time = latest.close_time
                 elif strategy.latest_payload.direction.allow_short and open_short:
+                    if not self._risk_allows(run, latest.close, latest.open, latest.high, latest.low):
+                        continue
                     signal_type = SignalType.OPEN_SHORT
                     state.position = "SHORT"
+                    state.last_open_time = latest.close_time
             elif state.position == "LONG" and close_long:
                 signal_type = SignalType.CLOSE_LONG
                 state.position = "FLAT"
+            elif state.position == "LONG" and open_short and run.payload.reverse_on_opposite:
+                signal_type = SignalType.CLOSE_LONG
+                state.position = "FLAT"
             elif state.position == "SHORT" and close_short:
+                signal_type = SignalType.CLOSE_SHORT
+                state.position = "FLAT"
+            elif state.position == "SHORT" and open_long and run.payload.reverse_on_opposite:
                 signal_type = SignalType.CLOSE_SHORT
                 state.position = "FLAT"
 
@@ -129,6 +176,7 @@ class SignalEngineService:
             if dedup_key in self._dedup_keys:
                 continue
             self._dedup_keys.add(dedup_key)
+            state.last_signal_time = latest.close_time
 
             record = SignalRecord(
                 id=uuid.uuid4().hex[:12],

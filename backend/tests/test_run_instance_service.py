@@ -26,6 +26,36 @@ class RunInstanceServiceTest(unittest.TestCase):
         copied = service.copy(instance.id)
         self.assertIn("副本", copied.payload.name)
 
+    def test_batch_status_and_group(self) -> None:
+        service = RunInstanceService()
+        payload_a = RunInstancePayload(
+            name="A",
+            strategy_id="s1",
+            symbol="ETH",
+            interval="15m",
+            fee_rate=0.0005,
+            slippage_rate=0.0005,
+            risk_limit=0.2,
+            group_name="g1",
+        )
+        payload_b = RunInstancePayload(
+            name="B",
+            strategy_id="s1",
+            symbol="QQQ",
+            interval="15m",
+            fee_rate=0.0005,
+            slippage_rate=0.0005,
+            risk_limit=0.2,
+            group_name="g2",
+        )
+        service.create(payload_a)
+        service.create(payload_b)
+
+        updated = service.batch_set_status(RunStatus.RUNNING, group_name="g1")
+        self.assertEqual(len(updated), 1)
+        self.assertEqual(updated[0].status, RunStatus.RUNNING)
+        self.assertEqual(service.group_summary()["g1"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -338,6 +338,12 @@ class RunInstancePayload(BaseModel):
     slippage_rate: float
     risk_limit: float
     notify_in_app: bool = True
+    group_name: str = "default"
+    reverse_on_opposite: bool = True
+    max_position_value: float = 100000
+    min_signal_interval_seconds: int = 60
+    cooldown_seconds: int = 0
+    require_volume: bool = True
 
 
 class RunInstance(BaseModel):
@@ -346,6 +352,11 @@ class RunInstance(BaseModel):
     created_at: str
     updated_at: str
     payload: RunInstancePayload
+
+
+class BatchRunAction(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+    group_name: str = ""
 
 
 class SignalType(str, Enum):

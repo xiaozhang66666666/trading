@@ -59,3 +59,25 @@ class RunInstanceService:
         updated = instance.model_copy(update={"status": status, "updated_at": self._now()})
         self._instances[instance_id] = updated
         return updated
+
+    def batch_set_status(self, status: RunStatus, ids: list[str] | None = None, group_name: str = "") -> list[RunInstance]:
+        targets: list[RunInstance] = []
+        id_set = set(ids or [])
+        for instance in self._instances.values():
+            if id_set and instance.id not in id_set:
+                continue
+            if group_name and instance.payload.group_name != group_name:
+                continue
+            targets.append(instance)
+
+        updated: list[RunInstance] = []
+        for instance in targets:
+            updated.append(self.set_status(instance.id, status))
+        return updated
+
+    def group_summary(self) -> dict[str, int]:
+        result: dict[str, int] = {}
+        for instance in self._instances.values():
+            group = instance.payload.group_name or "default"
+            result[group] = result.get(group, 0) + 1
+        return result

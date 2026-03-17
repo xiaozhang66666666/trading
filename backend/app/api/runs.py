@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_run_instance_service
-from app.core.models import RunInstance, RunInstancePayload, RunStatus
+from app.core.models import BatchRunAction, RunInstance, RunInstancePayload, RunStatus
 from app.services.run_instance_service import RunInstanceService
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
@@ -67,3 +67,23 @@ def stop_run(instance_id: str, service: RunInstanceService = Depends(get_run_ins
 def delete_run(instance_id: str, service: RunInstanceService = Depends(get_run_instance_service)) -> dict[str, str]:
     service.delete(instance_id)
     return {"status": "ok"}
+
+
+@router.get("/groups")
+def get_run_groups(service: RunInstanceService = Depends(get_run_instance_service)) -> dict[str, int]:
+    return service.group_summary()
+
+
+@router.post("/batch/start", response_model=list[RunInstance])
+def start_run_batch(payload: BatchRunAction, service: RunInstanceService = Depends(get_run_instance_service)) -> list[RunInstance]:
+    return service.batch_set_status(RunStatus.RUNNING, ids=payload.ids, group_name=payload.group_name)
+
+
+@router.post("/batch/pause", response_model=list[RunInstance])
+def pause_run_batch(payload: BatchRunAction, service: RunInstanceService = Depends(get_run_instance_service)) -> list[RunInstance]:
+    return service.batch_set_status(RunStatus.PAUSED, ids=payload.ids, group_name=payload.group_name)
+
+
+@router.post("/batch/stop", response_model=list[RunInstance])
+def stop_run_batch(payload: BatchRunAction, service: RunInstanceService = Depends(get_run_instance_service)) -> list[RunInstance]:
+    return service.batch_set_status(RunStatus.STOPPED, ids=payload.ids, group_name=payload.group_name)

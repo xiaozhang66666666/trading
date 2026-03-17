@@ -40,6 +40,14 @@ class _FakeMarketData:
         return candles
 
 
+class _ZeroVolumeMarketData(_FakeMarketData):
+    async def get_klines(self, symbol: Symbol, interval: str, limit: int) -> list[Kline]:
+        candles = await super().get_klines(symbol, interval, limit)
+        for candle in candles:
+            candle.volume = 0
+        return candles
+
+
 class SignalEngineServiceTest(unittest.TestCase):
     def test_dedup_and_stop_status(self) -> None:
         engine = SignalEngineService(market_data=_FakeMarketData())
@@ -90,6 +98,50 @@ class SignalEngineServiceTest(unittest.TestCase):
         run_stopped = run.model_copy(update={"status": RunStatus.STOPPED})
         third = asyncio.run(engine.tick([run_stopped], {"s1": strategy}, {"ETH": symbol}))
         self.assertEqual(len(third), 0)
+
+    def test_require_volume_filter(self) -> None:
+        engine = SignalEngineService(market_data=_ZeroVolumeMarketData())
+        payload = StrategyPayload(
+            name="策略A",
+            template=StrategyTemplate.MA_CROSS,
+            interval="1m",
+            open_condition="x",
+            close_condition="y",
+            take_profit=2,
+            stop_loss=1,
+            position_size=0.3,
+            direction=StrategyDirectionConfig(allow_long=True, allow_short=True, include_extended_hours=False),
+            json_dsl='{"strategy":{},"indicators":[],"conditions":{},"entry_long":{},"exit_long":{},"entry_short":{},"exit_short":{},"risk":{}}',
+        )
+        strategy = StrategyRecord(
+            id="s1",
+            name="策略A",
+            current_version=1,
+            updated_at=datetime.now(tz=timezone.utc).isoformat(),
+            latest_payload=payload,
+            versions=[StrategyVersion(version=1, created_at=datetime.now(tz=timezone.utc).isoformat(), payload=payload)],
+        )
+        run = RunInstance(
+            id="r1",
+            status=RunStatus.RUNNING,
+            created_at=datetime.now(tz=timezone.utc).isoformat(),
+            updated_at=datetime.now(tz=timezone.utc).isoformat(),
+            payload=RunInstancePayload(
+                name="run",
+                strategy_id="s1",
+                symbol="ETH",
+                interval="1m",
+                fee_rate=0.0,
+                slippage_rate=0.0,
+                risk_limit=0.2,
+                notify_in_app=True,
+                require_volume=True,
+            ),
+        )
+        symbol = Symbol(code="ETH", name="Ethereum", market=MarketType.CRYPTO, datasource="binance")
+
+        created = asyncio.run(engine.tick([run], {"s1": strategy}, {"ETH": symbol}))
+        self.assertEqual(created, [])
 
 
 if __name__ == "__main__":

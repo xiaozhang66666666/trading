@@ -308,6 +308,19 @@ class PortfolioBacktestResult(BaseModel):
     items: list[PortfolioItemResult]
 
 
+class PerformanceReport(BaseModel):
+    period_start: str
+    period_end: str
+    signal_count: int
+    signal_stats: dict[str, int]
+    trade_count: int
+    win_count: int
+    loss_count: int
+    realized_pnl: float
+    avg_trade_pnl: float
+    position_change_count: int
+
+
 class RunStatus(str, Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"

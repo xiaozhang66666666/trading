@@ -9,6 +9,7 @@ from app.services.market_data_service import MarketDataService
 from app.services.market_session import MarketSessionService
 from app.services.notification_service import NotificationService
 from app.services.run_instance_service import RunInstanceService
+from app.services.report_service import ReportService
 from app.services.signal_engine_service import SignalEngineService
 from app.services.strategy_service import StrategyService
 from app.services.symbol_service import SymbolService
@@ -82,6 +83,11 @@ def get_notification_service() -> NotificationService:
 @lru_cache
 def get_trade_ledger_service() -> TradeLedgerService:
     return TradeLedgerService()
+
+
+@lru_cache
+def get_report_service() -> ReportService:
+    return ReportService(signal_service=get_signal_engine_service(), ledger_service=get_trade_ledger_service())
 
 
 @lru_cache

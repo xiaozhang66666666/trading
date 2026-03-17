@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { addWatchlist, getDataSources, getWatchlist, removeWatchlist, searchSymbols } from "./api";
-import type { DataSourceStatus, DataState, SymbolView } from "./types";
+import { getDataSources, getMarketKlines, getMarketOverview, searchSymbols } from "./api";
+import type { DataSourceStatus, DataState, Kline, MarketOverview, SymbolView } from "./types";
+
+const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 
 const dataStateText: Record<DataState, string> = {
   REALTIME: "实时",
   DELAYED: "延迟",
-  DISCONNECTED: "断连",
+  DISCONNECTED: "断开",
   RESERVED: "预留",
 };
 
@@ -15,151 +17,349 @@ const marketText = {
   CRYPTO: "Crypto",
 };
 
+type IndicatorKey = "MA" | "EMA" | "RSI" | "MACD" | "BOLL";
+
+function formatNumber(value: number, fraction = 2): string {
+  return Number.isFinite(value) ? value.toLocaleString("zh-CN", { maximumFractionDigits: fraction }) : "-";
+}
+
+function sma(data: number[], period: number): Array<number | null> {
+  return data.map((_, index) => {
+    if (index + 1 < period) return null;
+    const slice = data.slice(index + 1 - period, index + 1);
+    return slice.reduce((acc, item) => acc + item, 0) / period;
+  });
+}
+
+function ema(data: number[], period: number): Array<number | null> {
+  const k = 2 / (period + 1);
+  let previous: number | null = null;
+  return data.map((value, index) => {
+    if (index === 0) {
+      previous = value;
+      return value;
+    }
+    if (previous == null) return null;
+    previous = value * k + previous * (1 - k);
+    return previous;
+  });
+}
+
+function stdDev(data: number[]): number {
+  const mean = data.reduce((acc, value) => acc + value, 0) / data.length;
+  const variance = data.reduce((acc, value) => acc + (value - mean) ** 2, 0) / data.length;
+  return Math.sqrt(variance);
+}
+
+function computeIndicators(candles: Kline[]) {
+  const closes = candles.map((item) => item.close);
+  const ma = sma(closes, 20);
+  const emaValues = ema(closes, 20);
+
+  const rsi = closes.map((_, index) => {
+    if (index < 14) return null;
+    let gains = 0;
+    let losses = 0;
+    for (let i = index - 13; i <= index; i += 1) {
+      const change = closes[i] - closes[i - 1];
+      if (change > 0) gains += change;
+      if (change < 0) losses += Math.abs(change);
+    }
+    if (losses === 0) return 100;
+    const rs = gains / losses;
+    return 100 - 100 / (1 + rs);
+  });
+
+  const ema12 = ema(closes, 12);
+  const ema26 = ema(closes, 26);
+  const macdLine = closes.map((_, index) => {
+    if (ema12[index] == null || ema26[index] == null) return null;
+    return (ema12[index] as number) - (ema26[index] as number);
+  });
+  const signalLine = ema(macdLine.map((item) => item ?? 0), 9);
+
+  const boll = closes.map((_, index) => {
+    if (index < 19) return { upper: null, middle: null, lower: null };
+    const sample = closes.slice(index - 19, index + 1);
+    const middle = sample.reduce((acc, value) => acc + value, 0) / sample.length;
+    const dev = stdDev(sample);
+    return { upper: middle + dev * 2, middle, lower: middle - dev * 2 };
+  });
+
+  return { ma, ema: emaValues, rsi, macdLine, signalLine, boll };
+}
+
+function CandleChart({ candles, enabledIndicators }: { candles: Kline[]; enabledIndicators: Set<IndicatorKey> }) {
+  if (candles.length === 0) {
+    return <div className="chart-empty">K 线加载失败或无可用数据</div>;
+  }
+
+  const width = 980;
+  const height = 420;
+  const priceMin = Math.min(...candles.map((item) => item.low));
+  const priceMax = Math.max(...candles.map((item) => item.high));
+  const priceRange = Math.max(priceMax - priceMin, 1e-6);
+  const candleWidth = Math.max(width / candles.length - 1, 2);
+  const indicator = computeIndicators(candles);
+
+  const yFromPrice = (price: number) => height - ((price - priceMin) / priceRange) * (height - 24) - 12;
+
+  function linePath(values: Array<number | null>): string {
+    let path = "";
+    values.forEach((value, index) => {
+      if (value == null) return;
+      const x = (index / Math.max(candles.length - 1, 1)) * (width - 8) + 4;
+      const y = yFromPrice(value);
+      path += path ? ` L ${x} ${y}` : `M ${x} ${y}`;
+    });
+    return path;
+  }
+
+  return (
+    <div className="chart-wrap">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="K线图">
+        <rect x="0" y="0" width={width} height={height} fill="url(#chartBg)" />
+        <defs>
+          <linearGradient id="chartBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0d1726" />
+            <stop offset="100%" stopColor="#090f19" />
+          </linearGradient>
+        </defs>
+
+        {candles.map((candle, index) => {
+          const x = (index / candles.length) * width;
+          const openY = yFromPrice(candle.open);
+          const closeY = yFromPrice(candle.close);
+          const highY = yFromPrice(candle.high);
+          const lowY = yFromPrice(candle.low);
+          const color = candle.close >= candle.open ? "#35d07f" : "#f05f66";
+          return (
+            <g key={candle.open_time}>
+              <line x1={x + candleWidth / 2} y1={highY} x2={x + candleWidth / 2} y2={lowY} stroke={color} strokeWidth="1" />
+              <rect
+                x={x}
+                y={Math.min(openY, closeY)}
+                width={candleWidth}
+                height={Math.max(Math.abs(closeY - openY), 1.5)}
+                fill={color}
+              />
+            </g>
+          );
+        })}
+
+        {enabledIndicators.has("MA") ? <path d={linePath(indicator.ma)} stroke="#59a8ff" strokeWidth="1.5" fill="none" /> : null}
+        {enabledIndicators.has("EMA") ? <path d={linePath(indicator.ema)} stroke="#ffd166" strokeWidth="1.5" fill="none" /> : null}
+        {enabledIndicators.has("BOLL") ? (
+          <>
+            <path d={linePath(indicator.boll.map((item) => item.upper))} stroke="#9d7dff" strokeWidth="1" fill="none" />
+            <path d={linePath(indicator.boll.map((item) => item.middle))} stroke="#7aa2f7" strokeWidth="1" fill="none" />
+            <path d={linePath(indicator.boll.map((item) => item.lower))} stroke="#9d7dff" strokeWidth="1" fill="none" />
+          </>
+        ) : null}
+      </svg>
+    </div>
+  );
+}
+
 export default function App() {
-  const [keyword, setKeyword] = useState("");
-  const [results, setResults] = useState<SymbolView[]>([]);
-  const [watchlist, setWatchlist] = useState<SymbolView[]>([]);
+  const [symbols, setSymbols] = useState<SymbolView[]>([]);
   const [sources, setSources] = useState<DataSourceStatus[]>([]);
+  const [activeSymbol, setActiveSymbol] = useState("QQQ");
+  const [activeInterval, setActiveInterval] = useState<(typeof intervals)[number]>("15m");
+  const [overview, setOverview] = useState<MarketOverview | null>(null);
+  const [klines, setKlines] = useState<Kline[]>([]);
+  const [keyword, setKeyword] = useState("");
+  const [enabledIndicators, setEnabledIndicators] = useState<Set<IndicatorKey>>(
+    () => new Set<IndicatorKey>(["MA", "EMA"]),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function refreshWatchlist() {
-    setWatchlist(await getWatchlist());
-  }
+  const filteredSymbols = useMemo(() => {
+    const key = keyword.trim().toLowerCase();
+    if (!key) return symbols;
+    return symbols.filter((item) => `${item.code}${item.name}`.toLowerCase().includes(key));
+  }, [keyword, symbols]);
 
   async function refreshSources() {
     setSources(await getDataSources());
   }
 
+  async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
+    setLoading(true);
+    setError("");
+    try {
+      const [nextOverview, nextKlines] = await Promise.all([
+        getMarketOverview(symbol),
+        getMarketKlines(symbol, interval, 220),
+      ]);
+      setOverview(nextOverview);
+      setKlines(nextKlines);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "看盘数据加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void searchSymbols("").then(setResults);
-    void refreshWatchlist();
+    void searchSymbols("").then((items) => {
+      setSymbols(items);
+      if (!items.some((item) => item.code === activeSymbol) && items.length > 0) {
+        setActiveSymbol(items[0].code);
+      }
+    });
     void refreshSources();
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setLoading(true);
-      setError("");
-      void searchSymbols(keyword)
-        .then(setResults)
-        .catch((err: unknown) => {
-          setError(err instanceof Error ? err.message : "搜索失败");
-        })
-        .finally(() => setLoading(false));
-    }, 250);
+    void refreshMarketData(activeSymbol, activeInterval);
+    const timer = window.setInterval(() => {
+      void refreshMarketData(activeSymbol, activeInterval);
+    }, 12000);
+    return () => window.clearInterval(timer);
+  }, [activeSymbol, activeInterval]);
 
-    return () => window.clearTimeout(timer);
-  }, [keyword]);
-
-  const watchlistCodeSet = useMemo(() => new Set(watchlist.map((item) => item.code)), [watchlist]);
-
-  async function onAdd(code: string) {
-    setWatchlist(await addWatchlist(code));
+  function toggleIndicator(indicator: IndicatorKey) {
+    setEnabledIndicators((prev) => {
+      const next = new Set(prev);
+      if (next.has(indicator)) next.delete(indicator);
+      else next.add(indicator);
+      return next;
+    });
   }
 
-  async function onRemove(code: string) {
-    setWatchlist(await removeWatchlist(code));
-  }
+  const quote = overview?.quote;
 
   return (
-    <div className="page">
-      <header className="header">
-        <h1>标的管理与数据源接入（T1-01）</h1>
-        <p>支持 QQQ / TQQQ / ETH 的搜索与自选管理，区分美股与 Crypto。</p>
-      </header>
-
-      <main className="layout">
-        <section className="panel">
-          <div className="panel-title-row">
-            <h2>标的搜索</h2>
-            <input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="输入代码或名称，如 QQQ / ETH"
-            />
-          </div>
-          {loading ? <div className="hint">搜索中...</div> : null}
-          {error ? <div className="error">{error}</div> : null}
-          <table>
-            <thead>
-              <tr>
-                <th>代码</th>
-                <th>名称</th>
-                <th>市场</th>
-                <th>数据状态</th>
-                <th>会话</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((item) => (
-                <tr key={item.code}>
-                  <td>{item.code}</td>
-                  <td>{item.name}</td>
-                  <td>
-                    <span className={`tag ${item.market === "CRYPTO" ? "crypto" : "us"}`}>
-                      {marketText[item.market]}
-                    </span>
-                  </td>
-                  <td title={item.data_detail}>{dataStateText[item.data_state]}</td>
-                  <td>{item.session_label}</td>
-                  <td>
-                    <button
-                      type="button"
-                      disabled={watchlistCodeSet.has(item.code)}
-                      onClick={() => onAdd(item.code)}
-                    >
-                      {watchlistCodeSet.has(item.code) ? "已加入" : "加入自选"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        <section className="panel">
-          <h2>自选列表</h2>
-          {watchlist.length === 0 ? <div className="hint">暂无自选标的</div> : null}
-          <ul className="watchlist">
-            {watchlist.map((item) => (
-              <li key={item.code}>
+    <div className="terminal-page">
+      <aside className="left-panel">
+        <h1>实时看盘（T1-02）</h1>
+        <input
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="搜索标的（QQQ/TQQQ/ETH）"
+          aria-label="搜索标的"
+        />
+        <ul className="symbol-list">
+          {filteredSymbols.map((item) => (
+            <li key={item.code}>
+              <button
+                type="button"
+                className={`symbol-btn ${activeSymbol === item.code ? "active" : ""}`}
+                onClick={() => setActiveSymbol(item.code)}
+              >
                 <div>
                   <strong>{item.code}</strong>
-                  <span>{marketText[item.market]}</span>
-                  <span>{dataStateText[item.data_state]}</span>
-                  <span>{item.session_label}</span>
+                  <span>{item.name}</span>
                 </div>
-                <button type="button" onClick={() => onRemove(item.code)}>
-                  删除
-                </button>
-              </li>
-            ))}
-          </ul>
+                <small>{marketText[item.market]}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <main className="main-panel">
+        <section className="summary-panel">
+          <div className="symbol-head">
+            <h2>{activeSymbol}</h2>
+            {overview ? <span className="session-tag">{overview.session_label}</span> : null}
+            {quote ? <span className={`state-tag ${quote.state.toLowerCase()}`}>{dataStateText[quote.state]}</span> : null}
+          </div>
+
+          <div className="quote-grid">
+            <div>
+              <label>最新价</label>
+              <strong>{formatNumber(quote?.last ?? 0, 4)}</strong>
+            </div>
+            <div>
+              <label>涨跌额</label>
+              <strong className={(quote?.change ?? 0) >= 0 ? "up" : "down"}>{formatNumber(quote?.change ?? 0, 4)}</strong>
+            </div>
+            <div>
+              <label>涨跌幅</label>
+              <strong className={(quote?.change_percent ?? 0) >= 0 ? "up" : "down"}>
+                {formatNumber(quote?.change_percent ?? 0, 2)}%
+              </strong>
+            </div>
+            <div>
+              <label>最高</label>
+              <strong>{formatNumber(quote?.high ?? 0, 4)}</strong>
+            </div>
+            <div>
+              <label>最低</label>
+              <strong>{formatNumber(quote?.low ?? 0, 4)}</strong>
+            </div>
+            <div>
+              <label>成交量</label>
+              <strong>{formatNumber(quote?.volume ?? 0, 2)}</strong>
+            </div>
+          </div>
+
+          <p className="quote-detail">{quote?.detail ?? "等待行情..."}</p>
         </section>
 
-        <section className="panel">
-          <div className="panel-title-row">
-            <h2>数据源状态</h2>
-            <button type="button" onClick={() => void refreshSources()}>
-              刷新
-            </button>
+        <section className="chart-panel">
+          <div className="toolbar-row">
+            <div className="interval-group">
+              {intervals.map((interval) => (
+                <button
+                  type="button"
+                  key={interval}
+                  className={activeInterval === interval ? "active" : ""}
+                  onClick={() => setActiveInterval(interval)}
+                >
+                  {interval}
+                </button>
+              ))}
+            </div>
+
+            <div className="indicator-group">
+              {(["MA", "EMA", "RSI", "MACD", "BOLL"] as const).map((indicator) => (
+                <button
+                  type="button"
+                  key={indicator}
+                  className={enabledIndicators.has(indicator) ? "active" : ""}
+                  onClick={() => toggleIndicator(indicator)}
+                >
+                  {indicator}
+                </button>
+              ))}
+            </div>
           </div>
-          <ul className="source-list">
-            {sources.map((source) => (
-              <li key={source.name}>
-                <div>
-                  <strong>{source.name}</strong>
-                  <span>{dataStateText[source.state]}</span>
-                </div>
-                <p>{source.detail}</p>
-                <small>检查时间：{new Date(source.checked_at).toLocaleString("zh-CN")}</small>
-              </li>
-            ))}
-          </ul>
+
+          {error ? <div className="error">{error}</div> : null}
+          {loading ? <div className="hint">加载中...</div> : null}
+          <CandleChart candles={klines} enabledIndicators={enabledIndicators} />
+
+          <div className="sub-indicators">
+            <div>RSI：{enabledIndicators.has("RSI") ? "已开启（14）" : "已关闭"}</div>
+            <div>MACD：{enabledIndicators.has("MACD") ? "已开启（12,26,9）" : "已关闭"}</div>
+            <div>BOLL：{enabledIndicators.has("BOLL") ? "已开启（20,2）" : "已关闭"}</div>
+          </div>
         </section>
       </main>
+
+      <aside className="right-panel">
+        <div className="panel-title-row">
+          <h3>数据源状态</h3>
+          <button type="button" onClick={() => void refreshSources()}>
+            刷新
+          </button>
+        </div>
+        <ul className="source-list">
+          {sources.map((source) => (
+            <li key={source.name}>
+              <div>
+                <strong>{source.name}</strong>
+                <span className={`state-tag ${source.state.toLowerCase()}`}>{dataStateText[source.state]}</span>
+              </div>
+              <p>{source.detail}</p>
+            </li>
+          ))}
+        </ul>
+      </aside>
     </div>
   );
 }

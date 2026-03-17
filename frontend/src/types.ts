@@ -18,3 +18,34 @@ export interface DataSourceStatus {
   detail: string;
   checked_at: string;
 }
+
+export interface MarketQuote {
+  symbol: string;
+  last: number;
+  change: number;
+  change_percent: number;
+  high: number;
+  low: number;
+  volume: number;
+  timestamp: string;
+  state: DataState;
+  detail: string;
+}
+
+export interface MarketOverview {
+  symbol: string;
+  market: MarketType;
+  session: string;
+  session_label: string;
+  quote: MarketQuote;
+}
+
+export interface Kline {
+  open_time: string;
+  close_time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.deps import get_symbol_service, get_symbol_view_assembler, get_watchlist_service
-from app.core.models import SymbolView, WatchlistAction
+from app.api.deps import (
+    get_market_data_service,
+    get_symbol_service,
+    get_symbol_view_assembler,
+    get_watchlist_service,
+)
+from app.core.models import Kline, MarketOverview, SymbolView, WatchlistAction
+from app.services.market_data_service import MarketDataService
 from app.services.symbol_service import SymbolService
 from app.services.symbol_view_assembler import SymbolViewAssembler
 from app.services.watchlist_service import WatchlistService
@@ -66,3 +72,29 @@ async def get_data_source_status(
     symbol_service: SymbolService = Depends(get_symbol_service),
 ):
     return await symbol_service.datasource_status()
+
+
+@router.get("/market/overview", response_model=MarketOverview)
+async def get_market_overview(
+    symbol: str,
+    symbol_service: SymbolService = Depends(get_symbol_service),
+    market_data: MarketDataService = Depends(get_market_data_service),
+) -> MarketOverview:
+    symbol_info = symbol_service.get_symbol(symbol)
+    if not symbol_info:
+        raise HTTPException(status_code=404, detail="标的不存在")
+    return await market_data.get_overview(symbol_info)
+
+
+@router.get("/market/klines", response_model=list[Kline])
+async def get_market_klines(
+    symbol: str,
+    interval: str = Query(default="15m", pattern="^(1m|5m|15m|1h|4h|1d)$"),
+    limit: int = Query(default=200, ge=30, le=500),
+    symbol_service: SymbolService = Depends(get_symbol_service),
+    market_data: MarketDataService = Depends(get_market_data_service),
+) -> list[Kline]:
+    symbol_info = symbol_service.get_symbol(symbol)
+    if not symbol_info:
+        raise HTTPException(status_code=404, detail="标的不存在")
+    return await market_data.get_klines(symbol_info, interval=interval, limit=limit)

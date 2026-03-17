@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from app.services.data_source_registry import DataSourceRegistry
+from app.services.market_data_service import MarketDataService
 from app.services.market_session import MarketSessionService
 from app.services.symbol_service import SymbolService
 from app.services.symbol_view_assembler import SymbolViewAssembler
@@ -27,3 +28,8 @@ def get_watchlist_service() -> WatchlistService:
 @lru_cache
 def get_symbol_view_assembler() -> SymbolViewAssembler:
     return SymbolViewAssembler(registry=get_registry(), session_service=MarketSessionService())
+
+
+@lru_cache
+def get_market_data_service() -> MarketDataService:
+    return MarketDataService(registry=get_registry(), session_service=MarketSessionService())

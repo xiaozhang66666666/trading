@@ -59,3 +59,34 @@ class DataSnapshot(BaseModel):
     state: DataState
     detail: str
     last_price: Optional[float] = None
+
+
+class MarketQuote(BaseModel):
+    symbol: str
+    last: float
+    change: float
+    change_percent: float
+    high: float
+    low: float
+    volume: float
+    timestamp: str
+    state: DataState
+    detail: str
+
+
+class Kline(BaseModel):
+    open_time: str
+    close_time: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+class MarketOverview(BaseModel):
+    symbol: str
+    market: MarketType
+    session: SessionType
+    session_label: str
+    quote: MarketQuote

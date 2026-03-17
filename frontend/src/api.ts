@@ -1,4 +1,4 @@
-import type { DataSourceStatus, SymbolView } from "./types";
+import type { DataSourceStatus, Kline, MarketOverview, SymbolView } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
@@ -18,23 +18,16 @@ export function searchSymbols(q: string): Promise<SymbolView[]> {
   return fetchJson<SymbolView[]>(`/api/v1/symbols/search?${query.toString()}`);
 }
 
-export function getWatchlist(): Promise<SymbolView[]> {
-  return fetchJson<SymbolView[]>("/api/v1/watchlist");
-}
-
-export function addWatchlist(symbol: string): Promise<SymbolView[]> {
-  return fetchJson<SymbolView[]>("/api/v1/watchlist", {
-    method: "POST",
-    body: JSON.stringify({ symbol }),
-  });
-}
-
-export function removeWatchlist(symbol: string): Promise<SymbolView[]> {
-  return fetchJson<SymbolView[]>(`/api/v1/watchlist/${symbol}`, {
-    method: "DELETE",
-  });
-}
-
 export function getDataSources(): Promise<DataSourceStatus[]> {
   return fetchJson<DataSourceStatus[]>("/api/v1/data-sources/status");
+}
+
+export function getMarketOverview(symbol: string): Promise<MarketOverview> {
+  const query = new URLSearchParams({ symbol });
+  return fetchJson<MarketOverview>(`/api/v1/market/overview?${query.toString()}`);
+}
+
+export function getMarketKlines(symbol: string, interval: string, limit = 200): Promise<Kline[]> {
+  const query = new URLSearchParams({ symbol, interval, limit: String(limit) });
+  return fetchJson<Kline[]>(`/api/v1/market/klines?${query.toString()}`);
 }

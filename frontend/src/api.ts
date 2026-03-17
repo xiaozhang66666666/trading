@@ -10,7 +10,10 @@ import type {
   RunInstance,
   RunInstancePayload,
   NotificationRecord,
+  PnlSummary,
+  PositionLog,
   SignalRecord,
+  TradeLog,
   SymbolView,
 } from "./types";
 
@@ -139,4 +142,20 @@ export function checkDatasourceNotifications(): Promise<{ created: number }> {
   return fetchJson<{ created: number }>("/api/v1/notifications/check-datasource", {
     method: "POST",
   });
+}
+
+export function listPositionLogs(): Promise<PositionLog[]> {
+  return fetchJson<PositionLog[]>("/api/v1/logs/positions");
+}
+
+export function listTradeLogs(): Promise<TradeLog[]> {
+  return fetchJson<TradeLog[]>("/api/v1/logs/trades");
+}
+
+export function getPnlSummary(): Promise<PnlSummary> {
+  return fetchJson<PnlSummary>("/api/v1/logs/pnl");
+}
+
+export function buildLogsExportUrl(): string {
+  return `${API_BASE}/api/v1/logs/export.csv`;
 }

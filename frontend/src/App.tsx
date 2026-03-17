@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   buildHistoryDownloadUrl,
+  buildLogsExportUrl,
   checkDatasourceNotifications,
   changeRunStatus,
   copyRun,
@@ -11,8 +12,11 @@ import {
   createStrategy,
   deleteStrategy,
   getDataSources,
+  getPnlSummary,
   getHistoryKlines,
+  listPositionLogs,
   listStrategies,
+  listTradeLogs,
   listRuns,
   listNotifications,
   listSignals,
@@ -32,6 +36,8 @@ import type {
   Kline,
   MarketOverview,
   NotificationRecord,
+  PnlSummary,
+  PositionLog,
   RunInstance,
   RunInstancePayload,
   SignalRecord,
@@ -39,6 +45,7 @@ import type {
   StrategyRecord,
   StrategyTemplate,
   SymbolView,
+  TradeLog,
 } from "./types";
 
 const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
@@ -251,6 +258,9 @@ export default function App() {
   const [signals, setSignals] = useState<SignalRecord[]>([]);
   const [signalError, setSignalError] = useState("");
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [positionLogs, setPositionLogs] = useState<PositionLog[]>([]);
+  const [tradeLogs, setTradeLogs] = useState<TradeLog[]>([]);
+  const [pnlSummary, setPnlSummary] = useState<PnlSummary | null>(null);
   const [strategyForm, setStrategyForm] = useState<StrategyPayload>({
     name: "策略A",
     template: "MA_CROSS",
@@ -292,6 +302,13 @@ export default function App() {
 
   async function refreshNotifications() {
     setNotifications(await listNotifications());
+  }
+
+  async function refreshLogs() {
+    const [positions, trades, pnl] = await Promise.all([listPositionLogs(), listTradeLogs(), getPnlSummary()]);
+    setPositionLogs(positions);
+    setTradeLogs(trades);
+    setPnlSummary(pnl);
   }
 
   async function loadHistory(symbol = activeSymbol, interval = activeInterval, force = false) {
@@ -389,6 +406,7 @@ export default function App() {
       await tickSignalEngine();
       await refreshSignals();
       await refreshNotifications();
+      await refreshLogs();
     } catch (err: unknown) {
       setSignalError(err instanceof Error ? err.message : "信号计算失败");
     }
@@ -434,6 +452,7 @@ export default function App() {
     void refreshRuns();
     void refreshSignals();
     void refreshNotifications();
+    void refreshLogs();
   }, []);
 
   useEffect(() => {
@@ -876,6 +895,53 @@ export default function App() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="logs-panel">
+          <div className="panel-title-row">
+            <h3>日志与盈亏（T1-09）</h3>
+            <a href={buildLogsExportUrl()} className="export-link">
+              导出日志 CSV
+            </a>
+          </div>
+          <div className="backtest-metrics">
+            <span>已实现盈亏：{formatNumber(pnlSummary?.realized_pnl ?? 0, 4)}</span>
+            <span>未实现盈亏：{formatNumber(pnlSummary?.unrealized_pnl ?? 0, 4)}</span>
+            <span>累计盈亏：{formatNumber(pnlSummary?.total_pnl ?? 0, 4)}</span>
+            <span>持仓日志：{positionLogs.length}</span>
+            <span>成交日志：{tradeLogs.length}</span>
+            <span>信号日志：{signals.length}</span>
+          </div>
+          <div className="trade-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>类型</th>
+                  <th>标的</th>
+                  <th>时间</th>
+                  <th>价格/盈亏</th>
+                </tr>
+              </thead>
+              <tbody>
+                {positionLogs.slice(0, 10).map((log) => (
+                  <tr key={log.id}>
+                    <td>{log.action}</td>
+                    <td>{log.symbol}</td>
+                    <td>{new Date(log.timestamp).toLocaleString("zh-CN")}</td>
+                    <td>{formatNumber(log.price, 4)}</td>
+                  </tr>
+                ))}
+                {tradeLogs.slice(0, 10).map((log) => (
+                  <tr key={log.id}>
+                    <td>TRADE-{log.side}</td>
+                    <td>{log.symbol}</td>
+                    <td>{new Date(log.exit_time).toLocaleString("zh-CN")}</td>
+                    <td className={log.realized_pnl >= 0 ? "up" : "down"}>{formatNumber(log.realized_pnl, 4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </aside>
     </div>

@@ -177,3 +177,34 @@ export interface NotificationRecord {
   created_at: string;
   read: boolean;
 }
+
+export interface PositionLog {
+  id: string;
+  run_instance_id: string;
+  symbol: string;
+  action: string;
+  position_side: string;
+  quantity: number;
+  price: number;
+  reason_snapshot: string;
+  timestamp: string;
+}
+
+export interface TradeLog {
+  id: string;
+  run_instance_id: string;
+  symbol: string;
+  side: string;
+  entry_time: string;
+  entry_price: number;
+  exit_time: string;
+  exit_price: number;
+  realized_pnl: number;
+  reason_snapshot: string;
+}
+
+export interface PnlSummary {
+  realized_pnl: number;
+  unrealized_pnl: number;
+  total_pnl: number;
+}

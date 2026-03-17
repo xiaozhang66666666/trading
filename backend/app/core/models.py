@@ -261,3 +261,34 @@ class NotificationRecord(BaseModel):
 
 class MarkReadPayload(BaseModel):
     ids: list[str]
+
+
+class PositionLog(BaseModel):
+    id: str
+    run_instance_id: str
+    symbol: str
+    action: str
+    position_side: str
+    quantity: float
+    price: float
+    reason_snapshot: str
+    timestamp: str
+
+
+class TradeLog(BaseModel):
+    id: str
+    run_instance_id: str
+    symbol: str
+    side: str
+    entry_time: str
+    entry_price: float
+    exit_time: str
+    exit_price: float
+    realized_pnl: float
+    reason_snapshot: str
+
+
+class PnlSummary(BaseModel):
+    realized_pnl: float
+    unrealized_pnl: float
+    total_pnl: float

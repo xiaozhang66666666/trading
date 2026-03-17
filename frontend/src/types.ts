@@ -219,6 +219,11 @@ export interface SystemSettings {
   us_regular_start: string;
   us_regular_end: string;
   us_after_market_end: string;
+  feishu_enabled: boolean;
+  feishu_webhook_url: string;
+  feishu_notify_signal: boolean;
+  feishu_notify_system: boolean;
+  feishu_throttle_seconds: number;
 }
 
 export interface SystemHealth {

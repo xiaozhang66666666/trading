@@ -70,7 +70,7 @@ def get_signal_engine_service() -> SignalEngineService:
 
 @lru_cache
 def get_notification_service() -> NotificationService:
-    return NotificationService()
+    return NotificationService(settings_service=get_system_settings_service())
 
 
 @lru_cache

@@ -304,6 +304,11 @@ class SystemSettings(BaseModel):
     us_regular_start: str = "09:30"
     us_regular_end: str = "16:00"
     us_after_market_end: str = "20:00"
+    feishu_enabled: bool = False
+    feishu_webhook_url: str = ""
+    feishu_notify_signal: bool = True
+    feishu_notify_system: bool = True
+    feishu_throttle_seconds: int = 60
 
 
 class SystemHealth(BaseModel):

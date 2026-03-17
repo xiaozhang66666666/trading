@@ -1020,6 +1020,63 @@ export default function App() {
                   setSystemSettings((prev) => (prev ? { ...prev, timezone: event.target.value } : prev))
                 }
               />
+              <span>飞书通知总开关</span>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={systemSettings.feishu_enabled}
+                  onChange={(event) =>
+                    setSystemSettings((prev) => (prev ? { ...prev, feishu_enabled: event.target.checked } : prev))
+                  }
+                />
+                启用飞书通知
+              </label>
+              <span>飞书 Webhook</span>
+              <input
+                value={systemSettings.feishu_webhook_url}
+                onChange={(event) =>
+                  setSystemSettings((prev) => (prev ? { ...prev, feishu_webhook_url: event.target.value } : prev))
+                }
+                placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
+              />
+              <span>飞书信号通知</span>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={systemSettings.feishu_notify_signal}
+                  onChange={(event) =>
+                    setSystemSettings((prev) =>
+                      prev ? { ...prev, feishu_notify_signal: event.target.checked } : prev,
+                    )
+                  }
+                />
+                开平仓推送
+              </label>
+              <span>飞书系统异常通知</span>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={systemSettings.feishu_notify_system}
+                  onChange={(event) =>
+                    setSystemSettings((prev) =>
+                      prev ? { ...prev, feishu_notify_system: event.target.checked } : prev,
+                    )
+                  }
+                />
+                异常推送
+              </label>
+              <span>节流秒数</span>
+              <input
+                type="number"
+                min={0}
+                step="1"
+                value={systemSettings.feishu_throttle_seconds}
+                onChange={(event) =>
+                  setSystemSettings((prev) =>
+                    prev ? { ...prev, feishu_throttle_seconds: Number(event.target.value) } : prev,
+                  )
+                }
+              />
             </div>
           ) : (
             <div className="hint">系统设置加载中...</div>

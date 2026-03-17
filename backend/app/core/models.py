@@ -90,3 +90,21 @@ class MarketOverview(BaseModel):
     session: SessionType
     session_label: str
     quote: MarketQuote
+
+
+class HistoryQuery(BaseModel):
+    symbol: str
+    interval: str
+    start: Optional[str] = None
+    end: Optional[str] = None
+    limit: int = 500
+
+
+class HistoryDataset(BaseModel):
+    symbol: str
+    interval: str
+    source: str
+    updated_at: str
+    missing_points: int
+    has_missing: bool
+    candles: list[Kline]

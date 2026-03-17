@@ -49,3 +49,13 @@ export interface Kline {
   close: number;
   volume: number;
 }
+
+export interface HistoryDataset {
+  symbol: string;
+  interval: string;
+  source: string;
+  updated_at: string;
+  missing_points: number;
+  has_missing: boolean;
+  candles: Kline[];
+}

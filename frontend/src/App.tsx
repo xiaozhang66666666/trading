@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { getDataSources, getMarketKlines, getMarketOverview, searchSymbols } from "./api";
-import type { DataSourceStatus, DataState, Kline, MarketOverview, SymbolView } from "./types";
+import {
+  buildHistoryDownloadUrl,
+  getDataSources,
+  getHistoryKlines,
+  getMarketKlines,
+  getMarketOverview,
+  refreshHistoryKlines,
+  searchSymbols,
+} from "./api";
+import type { DataSourceStatus, DataState, HistoryDataset, Kline, MarketOverview, SymbolView } from "./types";
 
 const intervals = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 
@@ -174,6 +182,9 @@ export default function App() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<HistoryDataset | null>(null);
+  const [historyError, setHistoryError] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const filteredSymbols = useMemo(() => {
     const key = keyword.trim().toLowerCase();
@@ -183,6 +194,19 @@ export default function App() {
 
   async function refreshSources() {
     setSources(await getDataSources());
+  }
+
+  async function loadHistory(symbol = activeSymbol, interval = activeInterval, force = false) {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const data = force ? await refreshHistoryKlines(symbol, interval) : await getHistoryKlines(symbol, interval);
+      setHistory(data);
+    } catch (err: unknown) {
+      setHistoryError(err instanceof Error ? err.message : "历史数据加载失败");
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   async function refreshMarketData(symbol = activeSymbol, interval = activeInterval) {
@@ -214,6 +238,7 @@ export default function App() {
 
   useEffect(() => {
     void refreshMarketData(activeSymbol, activeInterval);
+    void loadHistory(activeSymbol, activeInterval);
     const timer = window.setInterval(() => {
       void refreshMarketData(activeSymbol, activeInterval);
     }, 12000);
@@ -359,6 +384,30 @@ export default function App() {
             </li>
           ))}
         </ul>
+
+        <div className="history-panel">
+          <div className="panel-title-row">
+            <h3>历史数据中心（T1-03）</h3>
+            <button type="button" onClick={() => void loadHistory(activeSymbol, activeInterval, true)}>
+              手动刷新
+            </button>
+          </div>
+          <div className="history-meta">
+            <span>标的：{activeSymbol}</span>
+            <span>周期：{activeInterval}</span>
+            <span>来源：{history?.source ?? "-"}</span>
+            <span>更新时间：{history ? new Date(history.updated_at).toLocaleString("zh-CN") : "-"}</span>
+            <span className={history?.has_missing ? "down" : "up"}>
+              缺失检测：{history ? (history.has_missing ? `发现 ${history.missing_points} 个缺口` : "无缺失") : "-"}
+            </span>
+          </div>
+          <div className="history-actions">
+            <a href={buildHistoryDownloadUrl(activeSymbol, activeInterval, "csv")}>下载 CSV</a>
+            <a href={buildHistoryDownloadUrl(activeSymbol, activeInterval, "parquet")}>下载 Parquet</a>
+          </div>
+          {historyLoading ? <div className="hint">历史数据刷新中...</div> : null}
+          {historyError ? <div className="error">{historyError}</div> : null}
+        </div>
       </aside>
     </div>
   );
